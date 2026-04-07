@@ -1,0 +1,235 @@
+{
+	"info": {
+		"_postman_id": "a7c75072-5d65-4602-88c3-08117500eeb2",
+		"name": "FPD API PROD",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "PROD",
+			"item": [
+				{
+					"name": "GetFullSiteDetails",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "FPDAPI SubscriberToken=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "https://fppdirectapi-prod.fuelpricesqld.com.au/Subscriber/GetFullSiteDetails?countryId=21&geoRegionLevel=3&geoRegionId=1",
+							"protocol": "https",
+							"host": [
+								"fppdirectapi-prod",
+								"fuelpricesqld",
+								"com",
+								"au"
+							],
+							"path": [
+								"Subscriber",
+								"GetFullSiteDetails"
+							],
+							"query": [
+								{
+									"key": "countryId",
+									"value": "21"
+								},
+								{
+									"key": "geoRegionLevel",
+									"value": "3"
+								},
+								{
+									"key": "geoRegionId",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "GetCountryGeographicRegions",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "FPDAPI SubscriberToken=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "https://fppdirectapi-prod.fuelpricesqld.com.au/Subscriber/GetCountryGeographicRegions?countryId=21",
+							"protocol": "https",
+							"host": [
+								"fppdirectapi-prod",
+								"fuelpricesqld",
+								"com",
+								"au"
+							],
+							"path": [
+								"Subscriber",
+								"GetCountryGeographicRegions"
+							],
+							"query": [
+								{
+									"key": "countryId",
+									"value": "21"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "GetBrands",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "FPDAPI SubscriberToken=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "https://fppdirectapi-prod.fuelpricesqld.com.au/Subscriber/GetCountryBrands?countryId=21",
+							"protocol": "https",
+							"host": [
+								"fppdirectapi-prod",
+								"fuelpricesqld",
+								"com",
+								"au"
+							],
+							"path": [
+								"Subscriber",
+								"GetCountryBrands"
+							],
+							"query": [
+								{
+									"key": "countryId",
+									"value": "21"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "GetFuelTypes",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "FPDAPI SubscriberToken=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "https://fppdirectapi-prod.fuelpricesqld.com.au/Subscriber/GetCountryFuelTypes?countryId=21",
+							"protocol": "https",
+							"host": [
+								"fppdirectapi-prod",
+								"fuelpricesqld",
+								"com",
+								"au"
+							],
+							"path": [
+								"Subscriber",
+								"GetCountryFuelTypes"
+							],
+							"query": [
+								{
+									"key": "countryId",
+									"value": "21"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "GetSitePrices",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Authorization",
+								"value": "FPDAPI SubscriberToken=XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+							},
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": ""
+						},
+						"url": {
+							"raw": "https://fppdirectapi-prod.fuelpricesqld.com.au/Price/GetSitesPrices?countryId=21&geoRegionLevel=3&geoRegionId=1",
+							"protocol": "https",
+							"host": [
+								"fppdirectapi-prod",
+								"fuelpricesqld",
+								"com",
+								"au"
+							],
+							"path": [
+								"Price",
+								"GetSitesPrices"
+							],
+							"query": [
+								{
+									"key": "countryId",
+									"value": "21"
+								},
+								{
+									"key": "geoRegionLevel",
+									"value": "3"
+								},
+								{
+									"key": "geoRegionId",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		}
+	]
+}
