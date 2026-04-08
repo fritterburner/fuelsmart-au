@@ -40,27 +40,33 @@ export default function TripMap({ comparison, selectedStrategy }: Props) {
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <Polyline positions={comparison.routeGeometry} color="#64748b" weight={3} opacity={0.5} />
-      {selected.stops.map((stop, i) => (
-        <Marker
-          key={`${selectedStrategy}-${i}`}
-          position={[stop.station.lat, stop.station.lng]}
-          icon={makeStopIcon(color, i)}
-        >
-          <Popup>
-            <div className="text-sm">
-              <strong>Stop {i + 1}: {stop.station.name}</strong>
-              <br />
-              <span className="text-gray-500">{stop.distanceFromStart.toFixed(0)} km from start</span>
-              <br />
-              {stop.pricePerLitre.toFixed(1)} c/L &middot; Add {stop.litresAdded.toFixed(1)}L &middot; ${stop.cost.toFixed(2)}
-              <br />
-              <span className="text-gray-500">
-                Arrive: {stop.fuelOnArrival.toFixed(0)}L &rarr; Depart: {stop.fuelOnDeparture.toFixed(0)}L
-              </span>
-            </div>
-          </Popup>
-        </Marker>
-      ))}
+      {selected.stops.map((stop, i) => {
+        const prevKm = i === 0 ? 0 : selected.stops[i - 1].distanceFromStart;
+        const legDistance = stop.distanceFromStart - prevKm;
+        return (
+          <Marker
+            key={`${selectedStrategy}-${i}`}
+            position={[stop.station.lat, stop.station.lng]}
+            icon={makeStopIcon(color, i)}
+          >
+            <Popup>
+              <div className="text-sm">
+                <strong>Stop {i + 1}: {stop.station.name}</strong>
+                <br />
+                <span className="text-gray-500">
+                  {legDistance.toFixed(0)} km from {i === 0 ? "start" : `stop ${i}`}
+                </span>
+                <br />
+                {stop.pricePerLitre.toFixed(1)} c/L &middot; Add {stop.litresAdded.toFixed(1)}L &middot; ${stop.cost.toFixed(2)}
+                <br />
+                <span className="text-gray-500">
+                  Arrive: {stop.fuelOnArrival.toFixed(0)}L &rarr; Depart: {stop.fuelOnDeparture.toFixed(0)}L
+                </span>
+              </div>
+            </Popup>
+          </Marker>
+        );
+      })}
     </MapContainer>
   );
 }
