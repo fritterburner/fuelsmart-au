@@ -24,26 +24,64 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-// Find the closest point on the route to a station, return distance along route in km
+// Project a point onto a line segment and return distance from the point to
+// its closest position on the segment, plus how far along the segment that is (0-1).
+function pointToSegmentDist(
+  pLat: number, pLng: number,
+  aLat: number, aLng: number,
+  bLat: number, bLng: number
+): { dist: number; t: number } {
+  const dx = bLat - aLat;
+  const dy = bLng - aLng;
+  const lenSq = dx * dx + dy * dy;
+  if (lenSq === 0) return { dist: haversine(pLat, pLng, aLat, aLng), t: 0 };
+  const t = Math.max(0, Math.min(1, ((pLat - aLat) * dx + (pLng - aLng) * dy) / lenSq));
+  const projLat = aLat + t * dx;
+  const projLng = aLng + t * dy;
+  return { dist: haversine(pLat, pLng, projLat, projLng), t };
+}
+
+// Find the closest point on the route to a station, return distance along route in km.
+// Uses segment projection for accuracy on long straight outback stretches.
 function distanceAlongRoute(
   station: Station,
   routeGeometry: [number, number][],
   totalDistance: number
 ): { along: number; perpendicular: number } | null {
   let minDist = Infinity;
-  let bestIdx = 0;
+  let bestSegIdx = 0;
+  let bestT = 0;
 
-  for (let i = 0; i < routeGeometry.length; i++) {
-    const d = haversine(station.lat, station.lng, routeGeometry[i][0], routeGeometry[i][1]);
-    if (d < minDist) {
-      minDist = d;
-      bestIdx = i;
+  for (let i = 0; i < routeGeometry.length - 1; i++) {
+    const { dist, t } = pointToSegmentDist(
+      station.lat, station.lng,
+      routeGeometry[i][0], routeGeometry[i][1],
+      routeGeometry[i + 1][0], routeGeometry[i + 1][1]
+    );
+    if (dist < minDist) {
+      minDist = dist;
+      bestSegIdx = i;
+      bestT = t;
     }
   }
 
-  if (minDist > 5) return null; // more than 5km from route
+  // Also check distance to the last point
+  const lastDist = haversine(
+    station.lat, station.lng,
+    routeGeometry[routeGeometry.length - 1][0],
+    routeGeometry[routeGeometry.length - 1][1]
+  );
+  if (lastDist < minDist) {
+    minDist = lastDist;
+    bestSegIdx = routeGeometry.length - 2;
+    bestT = 1;
+  }
 
-  const along = (bestIdx / (routeGeometry.length - 1)) * totalDistance;
+  if (minDist > 15) return null; // more than 15km from route
+
+  // Interpolate the distance along the route
+  const fractionalIdx = bestSegIdx + bestT;
+  const along = (fractionalIdx / (routeGeometry.length - 1)) * totalDistance;
   return { along, perpendicular: minDist };
 }
 
