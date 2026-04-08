@@ -53,7 +53,6 @@ function MapController({
 
   // Fetch on initial mount
   useEffect(() => {
-    // Small delay to ensure map is fully rendered
     const timer = setTimeout(() => onBoundsChange(getBoundsString(map)), 200);
     return () => clearTimeout(timer);
   }, [map, onBoundsChange]);
@@ -85,6 +84,8 @@ interface Props {
 export default function MapView({ fuel, flyTo }: Props) {
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(false);
+  const [activeFuel, setActiveFuel] = useState<FuelCode>(fuel);
+  const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
   const fetchController = useRef<AbortController | null>(null);
 
   const fetchStations = useCallback(
@@ -101,6 +102,8 @@ export default function MapView({ fuel, flyTo }: Props) {
         });
         const data = await resp.json();
         setStations(data.stations || []);
+        setActiveFuel(data.activeFuel || fuel);
+        setFallbackNotice(data.fallbackNotice || null);
       } catch (e: any) {
         if (e.name !== "AbortError") console.error("Failed to fetch stations:", e);
       }
@@ -109,9 +112,10 @@ export default function MapView({ fuel, flyTo }: Props) {
     [fuel]
   );
 
-  // Compute price range for colour coding
+  // Compute price range for colour coding (using activeFuel, which may be a fallback)
+  const displayFuel = activeFuel;
   const prices = stations
-    .map((s) => s.prices.find((p) => p.fuel === fuel)?.price)
+    .map((s) => s.prices.find((p) => p.fuel === displayFuel)?.price)
     .filter(Boolean) as number[];
   const minPrice = Math.min(...prices, Infinity);
   const maxPrice = Math.max(...prices, -Infinity);
@@ -128,7 +132,7 @@ export default function MapView({ fuel, flyTo }: Props) {
       <MapController onBoundsChange={fetchStations} fuel={fuel} />
       <FlyTo center={flyTo} />
       {stations.map((station) => {
-        const priceEntry = station.prices.find((p) => p.fuel === fuel);
+        const priceEntry = station.prices.find((p) => p.fuel === displayFuel);
         if (!priceEntry) return null;
         const color = getPriceColor(priceEntry.price, minPrice, maxPrice);
         const icon = createPriceIcon(priceEntry.price, color);
@@ -155,7 +159,13 @@ export default function MapView({ fuel, flyTo }: Props) {
           </Marker>
         );
       })}
-      {loading && (
+      {/* Fallback fuel notice banner */}
+      {fallbackNotice && (
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] bg-amber-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium max-w-md text-center">
+          {fallbackNotice}
+        </div>
+      )}
+      {loading && !fallbackNotice && (
         <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] bg-white px-3 py-1 rounded shadow text-sm">
           Loading...
         </div>

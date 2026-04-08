@@ -1,5 +1,12 @@
 import { FuelCode, FuelType } from "./types";
 
+// When a fuel type has no results in an area, these fallbacks can be shown instead.
+// Key = requested fuel, Value = array of fallback fuels in priority order.
+export const FUEL_FALLBACKS: Partial<Record<FuelCode, FuelCode[]>> = {
+  U91: ["LAF"],   // Low Aromatic / OPAL can substitute for U91 in remote areas
+  E10: ["U91", "LAF"], // E10 can fall back to U91, then LAF
+};
+
 export const FUEL_TYPES: FuelType[] = [
   { code: "U91", name: "Unleaded 91" },
   { code: "DL", name: "Diesel" },

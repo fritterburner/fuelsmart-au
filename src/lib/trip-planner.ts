@@ -270,7 +270,7 @@ function planCheapestFill(
   return { stops, warnings };
 }
 
-// ─── Strategy 3: No planning (stop at first station when tank hits 25%) ─────
+// ─── Strategy 3: No planning (stop at first station when fuel light comes on) ─
 
 function planNoPlanning(
   deduped: RouteStation[],
@@ -278,8 +278,9 @@ function planNoPlanning(
   kmPerLitre: number,
   totalDistance: number
 ): { stops: TripStop[]; warnings: string[] } {
-  const lowFuelThreshold = totalCapacity * 0.25; // stop when 25% remaining
-  const minStopGap = 20; // still avoid back-to-back but more relaxed
+  // Fuel light comes on at ~1/8 tank (12.5%). Driver pulls into the next servo.
+  const fuelLightThreshold = totalCapacity * 0.125;
+  const safetyLitres = totalCapacity * 0.05; // absolute minimum before stranded
 
   const warnings: string[] = [];
   const stops: TripStop[] = [];
@@ -288,35 +289,30 @@ function planNoPlanning(
 
   while (currentKm < totalDistance) {
     const fuelNeededToFinish = (totalDistance - currentKm) / kmPerLitre;
-    if (currentFuel >= fuelNeededToFinish) break;
+    if (currentFuel >= fuelNeededToFinish + safetyLitres) break;
 
-    // Drive until fuel drops to 25%
-    const kmUntilLow = (currentFuel - lowFuelThreshold) * kmPerLitre;
-    const lowFuelKm = currentKm + kmUntilLow;
+    // Drive until fuel light comes on
+    const kmUntilLight = (currentFuel - fuelLightThreshold) * kmPerLitre;
+    const fuelLightKm = currentKm + Math.max(0, kmUntilLight);
 
-    // Find the first station after we hit low fuel (or the last one before)
-    const nextStation = deduped.find(
-      (s) => s.along > currentKm + minStopGap && s.along <= lowFuelKm + 50 // some buffer
+    // Find the first station AFTER the fuel light point (nearest servo once light is on)
+    let nextStation = deduped.find(
+      (s) => s.along >= fuelLightKm && s.along <= currentKm + currentFuel * kmPerLitre
     );
 
+    // If nothing after the light point, look for the last station before running dry
     if (!nextStation) {
-      // Try any station ahead within full range
-      const anyStation = deduped.find(
-        (s) => s.along > currentKm + 1 && s.along <= currentKm + currentFuel * kmPerLitre
+      const beforeDry = deduped.filter(
+        (s) => s.along > currentKm + 1 && s.along <= currentKm + (currentFuel - safetyLitres) * kmPerLitre
       );
-      if (!anyStation) {
-        warnings.push(
-          `Warning: No reachable station from km ${Math.round(currentKm)}.`
-        );
-        break;
-      }
-      const fuelUsed = (anyStation.along - currentKm) / kmPerLitre;
-      const fuelOnArrival = currentFuel - fuelUsed;
-      const litresAdded = totalCapacity - fuelOnArrival;
-      stops.push(makeStop(anyStation, currentKm, currentFuel, kmPerLitre, litresAdded));
-      currentFuel = totalCapacity;
-      currentKm = anyStation.along;
-      continue;
+      nextStation = beforeDry.length > 0 ? beforeDry[beforeDry.length - 1] : undefined;
+    }
+
+    if (!nextStation) {
+      warnings.push(
+        `Warning: No reachable station from km ${Math.round(currentKm)}.`
+      );
+      break;
     }
 
     const fuelUsed = (nextStation.along - currentKm) / kmPerLitre;
@@ -346,7 +342,7 @@ function buildStrategyResult(
   const descriptions = {
     optimised: "Smart partial fills — skips expensive stations, buys less at pricey stops",
     cheapest_fill: "Always drives to the cheapest reachable station and fills to brim",
-    no_planning: "Stops at the first available station when tank hits 25%, fills to full",
+    no_planning: "Drives until the fuel light comes on, pulls into the next servo, fills to full",
   };
 
   const totalFuelCost = stops.reduce((sum, s) => sum + s.cost, 0);
