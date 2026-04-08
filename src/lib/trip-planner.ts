@@ -41,48 +41,93 @@ function pointToSegmentDist(
   return { dist: haversine(pLat, pLng, projLat, projLng), t };
 }
 
-// Find the closest point on the route to a station, return distance along route in km.
-// Uses segment projection for accuracy on long straight outback stretches.
+// Compute cumulative distances along route geometry segments (cached per call batch).
+let _cachedGeometry: [number, number][] | null = null;
+let _cachedCumDist: number[] | null = null;
+
+function getCumulativeDistances(routeGeometry: [number, number][]): number[] {
+  if (_cachedGeometry === routeGeometry && _cachedCumDist) return _cachedCumDist;
+  const cumDist = [0];
+  for (let i = 1; i < routeGeometry.length; i++) {
+    cumDist.push(
+      cumDist[i - 1] +
+        haversine(
+          routeGeometry[i - 1][0], routeGeometry[i - 1][1],
+          routeGeometry[i][0], routeGeometry[i][1]
+        )
+    );
+  }
+  _cachedGeometry = routeGeometry;
+  _cachedCumDist = cumDist;
+  return cumDist;
+}
+
+// Find all positions along the route where a station is nearby.
+// Returns one entry per distinct "pass" — so a station near a route that doubles
+// back will appear at multiple along-distances (once per pass).
 function distanceAlongRoute(
   station: Station,
   routeGeometry: [number, number][],
   totalDistance: number
-): { along: number; perpendicular: number } | null {
-  let minDist = Infinity;
-  let bestSegIdx = 0;
-  let bestT = 0;
+): { along: number; perpendicular: number }[] {
+  const THRESHOLD = 15; // km
+  const cumDist = getCumulativeDistances(routeGeometry);
+  const totalHaversine = cumDist[cumDist.length - 1];
+  if (totalHaversine === 0) return [];
 
+  // Compute perpendicular distance for each segment
+  const segResults: { dist: number; t: number }[] = [];
   for (let i = 0; i < routeGeometry.length - 1; i++) {
-    const { dist, t } = pointToSegmentDist(
-      station.lat, station.lng,
-      routeGeometry[i][0], routeGeometry[i][1],
-      routeGeometry[i + 1][0], routeGeometry[i + 1][1]
+    segResults.push(
+      pointToSegmentDist(
+        station.lat, station.lng,
+        routeGeometry[i][0], routeGeometry[i][1],
+        routeGeometry[i + 1][0], routeGeometry[i + 1][1]
+      )
     );
-    if (dist < minDist) {
-      minDist = dist;
-      bestSegIdx = i;
-      bestT = t;
+  }
+
+  // Find contiguous runs of segments within threshold.
+  // Each run = one pass of the route near this station. Keep the best match per run.
+  const results: { along: number; perpendicular: number }[] = [];
+  let inRun = false;
+  let runBestDist = Infinity;
+  let runBestIdx = 0;
+  let runBestT = 0;
+
+  for (let i = 0; i < segResults.length; i++) {
+    if (segResults[i].dist <= THRESHOLD) {
+      if (!inRun) {
+        inRun = true;
+        runBestDist = segResults[i].dist;
+        runBestIdx = i;
+        runBestT = segResults[i].t;
+      } else if (segResults[i].dist < runBestDist) {
+        runBestDist = segResults[i].dist;
+        runBestIdx = i;
+        runBestT = segResults[i].t;
+      }
+    } else if (inRun) {
+      // End of run — emit best match
+      const hDist = cumDist[runBestIdx] + runBestT * (cumDist[runBestIdx + 1] - cumDist[runBestIdx]);
+      results.push({
+        along: (hDist / totalHaversine) * totalDistance,
+        perpendicular: runBestDist,
+      });
+      inRun = false;
+      runBestDist = Infinity;
     }
   }
-
-  // Also check distance to the last point
-  const lastDist = haversine(
-    station.lat, station.lng,
-    routeGeometry[routeGeometry.length - 1][0],
-    routeGeometry[routeGeometry.length - 1][1]
-  );
-  if (lastDist < minDist) {
-    minDist = lastDist;
-    bestSegIdx = routeGeometry.length - 2;
-    bestT = 1;
+  // Flush final run
+  if (inRun) {
+    const hDist = cumDist[runBestIdx] + runBestT * (cumDist[runBestIdx + 1] - cumDist[runBestIdx]);
+    results.push({
+      along: (hDist / totalHaversine) * totalDistance,
+      perpendicular: runBestDist,
+    });
   }
 
-  if (minDist > 15) return null; // more than 15km from route
-
-  // Interpolate the distance along the route
-  const fractionalIdx = bestSegIdx + bestT;
-  const along = (fractionalIdx / (routeGeometry.length - 1)) * totalDistance;
-  return { along, perpendicular: minDist };
+  return results;
 }
 
 interface RouteStation {
@@ -97,16 +142,20 @@ function prepareRouteStations(
   routeGeometry: [number, number][],
   totalDistance: number
 ): { all: RouteStation[]; deduped: RouteStation[] } {
-  const routeStations = stations
-    .map((s) => {
-      const pos = distanceAlongRoute(s, routeGeometry, totalDistance);
-      if (!pos) return null;
-      const priceEntry = s.prices.find((p) => p.fuel === fuel);
-      if (!priceEntry) return null;
-      return { station: s, along: pos.along, price: priceEntry.price };
-    })
-    .filter(Boolean)
-    .sort((a, b) => a!.along - b!.along) as RouteStation[];
+  // Reset cumulative distance cache for this route
+  _cachedGeometry = null;
+  _cachedCumDist = null;
+
+  const routeStations: RouteStation[] = [];
+  for (const s of stations) {
+    const priceEntry = s.prices.find((p) => p.fuel === fuel);
+    if (!priceEntry) continue;
+    const positions = distanceAlongRoute(s, routeGeometry, totalDistance);
+    for (const pos of positions) {
+      routeStations.push({ station: s, along: pos.along, price: priceEntry.price });
+    }
+  }
+  routeStations.sort((a, b) => a.along - b.along);
 
   // Deduplicate: keep only the cheapest station per 3km cluster
   const deduped: RouteStation[] = [];
