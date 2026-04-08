@@ -27,7 +27,7 @@ export default function Home() {
   }, [menuOpen]);
 
   return (
-    <div className="h-dvh flex flex-col">
+    <div className="h-dvh flex flex-col overflow-hidden overscroll-none">
       {/* Header — two rows on mobile, single row on md+ */}
       <header className="bg-slate-800 text-white shadow-md z-[1000] safe-area-top safe-area-inset">
         {/* Row 1: logo + fuel select + action icons */}

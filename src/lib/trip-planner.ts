@@ -418,9 +418,47 @@ export function planTripComparison(params: TripParams): TripComparison {
 
   const { deduped } = prepareRouteStations(stations, fuel, routeGeometry, totalDistance);
 
+  // Detect coverage gaps — warn if large sections of route have no stations
+  const coverageWarnings: string[] = [];
+  if (deduped.length > 0) {
+    // Check gap from start to first station
+    if (deduped[0].along > 200) {
+      coverageWarnings.push(
+        `No fuel price data for the first ${Math.round(deduped[0].along)} km of this route. ` +
+        `The route may pass through states we don't have data for (SA, VIC, TAS).`
+      );
+    }
+    // Check gap from last station to end
+    if (totalDistance - deduped[deduped.length - 1].along > 200) {
+      coverageWarnings.push(
+        `No fuel price data for the last ${Math.round(totalDistance - deduped[deduped.length - 1].along)} km of this route.`
+      );
+    }
+    // Check gaps between stations
+    for (let i = 1; i < deduped.length; i++) {
+      const gap = deduped[i].along - deduped[i - 1].along;
+      if (gap > 500) {
+        coverageWarnings.push(
+          `${Math.round(gap)} km gap with no fuel data between km ${Math.round(deduped[i - 1].along)} and km ${Math.round(deduped[i].along)}. ` +
+          `This section may pass through SA, VIC, or TAS where we don't yet have price data.`
+        );
+      }
+    }
+  } else if (totalDistance > 100) {
+    coverageWarnings.push(
+      `No fuel stations found along this ${Math.round(totalDistance)} km route. ` +
+      `The route may pass entirely through states we don't have data for (SA, VIC, TAS, NSW).`
+    );
+  }
+
   const optimised = planOptimised(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel);
   const cheapestFill = planCheapestFill(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel);
   const noPlanning = planNoPlanning(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel);
+
+  // Prepend coverage warnings to all strategies
+  for (const result of [optimised, cheapestFill, noPlanning]) {
+    result.warnings = [...coverageWarnings, ...result.warnings];
+  }
 
   return {
     origin: { lat: routeGeometry[0][0], lng: routeGeometry[0][1], label: "Origin" },
