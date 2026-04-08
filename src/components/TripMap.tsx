@@ -57,7 +57,7 @@ export default function TripMap({ comparison, selectedStrategy }: Props) {
                   {legDistance.toFixed(0)} km from {i === 0 ? "start" : `stop ${i}`}
                 </span>
                 <br />
-                {stop.pricePerLitre.toFixed(1)} c/L &middot; Add {stop.litresAdded.toFixed(1)}L &middot; ${stop.cost.toFixed(2)}
+                {stop.pricePerLitre.toFixed(1)} c/L{stop.fallbackFuel ? ` (${stop.fallbackFuel})` : ""} &middot; Add {stop.litresAdded.toFixed(1)}L &middot; ${stop.cost.toFixed(2)}
                 <br />
                 <span className="text-gray-500">
                   Arrive: {stop.fuelOnArrival.toFixed(0)}L &rarr; Depart: {stop.fuelOnDeparture.toFixed(0)}L

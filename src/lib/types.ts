@@ -42,6 +42,7 @@ export interface TripStop {
   fuelOnDeparture: number;
   cost: number; // dollars
   pricePerLitre: number; // cents
+  fallbackFuel?: FuelCode; // set when using LAF/OPAL instead of requested fuel
 }
 
 export interface TripPlan {

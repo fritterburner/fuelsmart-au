@@ -107,6 +107,11 @@ function StopList({ result }: { result: StrategyResult }) {
           {/* Price details — stacked on mobile, inline on desktop */}
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm mb-2">
             <span className="text-base md:text-lg font-bold text-gray-900">{stop.pricePerLitre.toFixed(1)} c/L</span>
+            {stop.fallbackFuel && (
+              <span className="text-xs font-medium bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                {stop.fallbackFuel}
+              </span>
+            )}
             <span className="text-gray-700">Add {stop.litresAdded.toFixed(1)}L</span>
             <span className="font-bold text-gray-900">${stop.cost.toFixed(2)}</span>
           </div>

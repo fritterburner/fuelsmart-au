@@ -1,4 +1,5 @@
 import { Station, FuelCode, TripStop, TripPlan, TripComparison, StrategyResult } from "./types";
+import { FUEL_FALLBACKS } from "./fuel-codes";
 
 interface TripParams {
   fuel: FuelCode;
@@ -9,6 +10,7 @@ interface TripParams {
   stations: Station[];
   totalDistance: number; // km
   startingFuelPct?: number; // 0-100, defaults to 100
+  allowFallback?: boolean; // use LAF/OPAL when primary fuel unavailable
 }
 
 // Haversine distance in km
@@ -134,25 +136,37 @@ interface RouteStation {
   station: Station;
   along: number;
   price: number;
+  fallbackFuel?: FuelCode; // set when using a fallback fuel type
 }
 
 function prepareRouteStations(
   stations: Station[],
   fuel: FuelCode,
   routeGeometry: [number, number][],
-  totalDistance: number
+  totalDistance: number,
+  allowFallback?: boolean
 ): { all: RouteStation[]; deduped: RouteStation[] } {
   // Reset cumulative distance cache for this route
   _cachedGeometry = null;
   _cachedCumDist = null;
 
+  const fallbacks = allowFallback ? (FUEL_FALLBACKS[fuel] || []) : [];
+
   const routeStations: RouteStation[] = [];
   for (const s of stations) {
-    const priceEntry = s.prices.find((p) => p.fuel === fuel);
+    // Try primary fuel first, then fallbacks
+    let priceEntry = s.prices.find((p) => p.fuel === fuel);
+    let usedFallback: FuelCode | undefined;
+    if (!priceEntry && fallbacks.length > 0) {
+      for (const fb of fallbacks) {
+        priceEntry = s.prices.find((p) => p.fuel === fb);
+        if (priceEntry) { usedFallback = fb; break; }
+      }
+    }
     if (!priceEntry) continue;
     const positions = distanceAlongRoute(s, routeGeometry, totalDistance);
     for (const pos of positions) {
-      routeStations.push({ station: s, along: pos.along, price: priceEntry.price });
+      routeStations.push({ station: s, along: pos.along, price: priceEntry.price, fallbackFuel: usedFallback });
     }
   }
   routeStations.sort((a, b) => a.along - b.along);
@@ -190,6 +204,7 @@ function makeStop(
     fuelOnDeparture: fuelOnArrival + litresAdded,
     cost: (litresAdded * rs.price) / 100,
     pricePerLitre: rs.price,
+    ...(rs.fallbackFuel ? { fallbackFuel: rs.fallbackFuel } : {}),
   };
 }
 
@@ -468,7 +483,7 @@ export function planTripComparison(params: TripParams): TripComparison {
   const kmPerLitre = 100 / consumption;
   const startingFuel = totalCapacity * (startingFuelPct / 100);
 
-  const { deduped } = prepareRouteStations(stations, fuel, routeGeometry, totalDistance);
+  const { deduped } = prepareRouteStations(stations, fuel, routeGeometry, totalDistance, params.allowFallback);
 
   // Detect coverage gaps — warn if large sections of route have no stations
   const coverageWarnings: string[] = [];
