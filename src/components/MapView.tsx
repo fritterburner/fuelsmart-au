@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Station, FuelCode } from "@/lib/types";
@@ -22,7 +22,7 @@ function getPriceColor(price: number, min: number, max: number): string {
   return "#f59e0b"; // yellow — middle
 }
 
-function createPriceIcon(price: number, color: string, brandCode: string): L.DivIcon {
+function createPriceIcon(price: number, color: string): L.DivIcon {
   return L.divIcon({
     className: "price-marker",
     html: `<div style="background:${color};color:white;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;white-space:nowrap;border:1px solid rgba(0,0,0,0.2);text-align:center;">${price.toFixed(1)}</div>`,
@@ -31,14 +31,41 @@ function createPriceIcon(price: number, color: string, brandCode: string): L.Div
   });
 }
 
-function MapEvents({ onBoundsChange }: { onBoundsChange: (bounds: string) => void }) {
+function getBoundsString(map: L.Map): string {
+  const b = map.getBounds();
+  return `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
+}
+
+function MapController({
+  onBoundsChange,
+  fuel,
+}: {
+  onBoundsChange: (bounds: string) => void;
+  fuel: FuelCode;
+}) {
+  const map = useMap();
+  const lastFuel = useRef(fuel);
+
+  // Fetch on map move
   useMapEvents({
-    moveend: (e) => {
-      const map = e.target;
-      const b = map.getBounds();
-      onBoundsChange(`${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`);
-    },
+    moveend: () => onBoundsChange(getBoundsString(map)),
   });
+
+  // Fetch on initial mount
+  useEffect(() => {
+    // Small delay to ensure map is fully rendered
+    const timer = setTimeout(() => onBoundsChange(getBoundsString(map)), 200);
+    return () => clearTimeout(timer);
+  }, [map, onBoundsChange]);
+
+  // Re-fetch when fuel type changes
+  useEffect(() => {
+    if (lastFuel.current !== fuel) {
+      lastFuel.current = fuel;
+      onBoundsChange(getBoundsString(map));
+    }
+  }, [fuel, map, onBoundsChange]);
+
   return null;
 }
 
@@ -58,13 +85,25 @@ interface Props {
 export default function MapView({ fuel, flyTo }: Props) {
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(false);
+  const fetchController = useRef<AbortController | null>(null);
 
   const fetchStations = useCallback(
     async (bounds: string) => {
+      // Cancel any in-flight request
+      if (fetchController.current) fetchController.current.abort();
+      const controller = new AbortController();
+      fetchController.current = controller;
+
       setLoading(true);
-      const resp = await fetch(`/api/stations?bounds=${bounds}&fuel=${fuel}`);
-      const data = await resp.json();
-      setStations(data.stations || []);
+      try {
+        const resp = await fetch(`/api/stations?bounds=${bounds}&fuel=${fuel}`, {
+          signal: controller.signal,
+        });
+        const data = await resp.json();
+        setStations(data.stations || []);
+      } catch (e: any) {
+        if (e.name !== "AbortError") console.error("Failed to fetch stations:", e);
+      }
       setLoading(false);
     },
     [fuel]
@@ -86,13 +125,13 @@ export default function MapView({ fuel, flyTo }: Props) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <MapEvents onBoundsChange={fetchStations} />
+      <MapController onBoundsChange={fetchStations} fuel={fuel} />
       <FlyTo center={flyTo} />
       {stations.map((station) => {
         const priceEntry = station.prices.find((p) => p.fuel === fuel);
         if (!priceEntry) return null;
         const color = getPriceColor(priceEntry.price, minPrice, maxPrice);
-        const icon = createPriceIcon(priceEntry.price, color, station.brandCode);
+        const icon = createPriceIcon(priceEntry.price, color);
 
         return (
           <Marker key={station.id} position={[station.lat, station.lng]} icon={icon}>

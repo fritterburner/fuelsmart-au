@@ -49,8 +49,14 @@ function distanceAlongRoute(
 export function planTrip(params: TripParams): TripPlan {
   const { fuel, tankSize, consumption, jerryCapacity, routeGeometry, stations, totalDistance } = params;
   const totalCapacity = tankSize + jerryCapacity;
-  const safetyMargin = totalCapacity * 0.15;
   const kmPerLitre = 100 / consumption;
+
+  // Safety: always keep at least 20% of tank OR 30km worth of fuel, whichever is larger
+  const safetyLitres = Math.max(totalCapacity * 0.20, 30 / kmPerLitre);
+  // Minimum fill: don't stop unless adding at least 15L (or 20% of tank for small tanks)
+  const minFill = Math.max(15, totalCapacity * 0.20);
+  // Minimum distance between stops: 50km (no Palmerston strip spam)
+  const minStopGap = 50;
 
   // Find stations along route with their distance along route and price
   const routeStations = stations
@@ -68,78 +74,146 @@ export function planTrip(params: TripParams): TripPlan {
     price: number;
   }[];
 
+  // Deduplicate: keep only the cheapest station per 10km segment
+  const dedupedStations: typeof routeStations = [];
+  for (const s of routeStations) {
+    const existing = dedupedStations.find(
+      (d) => Math.abs(d.along - s.along) < 3 // within 3km = same cluster
+    );
+    if (existing) {
+      if (s.price < existing.price) {
+        dedupedStations[dedupedStations.indexOf(existing)] = s;
+      }
+    } else {
+      dedupedStations.push(s);
+    }
+  }
+
   const warnings: string[] = [];
   const stops: TripStop[] = [];
   let currentFuel = totalCapacity; // start with full tank
   let currentKm = 0;
+  let lastStopKm = -minStopGap; // allow first stop anywhere
 
-  // Greedy look-ahead algorithm
+  // Greedy look-ahead algorithm with practical constraints
   while (currentKm < totalDistance) {
     const fuelNeededToFinish = (totalDistance - currentKm) / kmPerLitre;
 
-    // Can we reach the destination?
-    if (currentFuel >= fuelNeededToFinish + safetyMargin) break;
+    // Can we reach the destination with safety margin?
+    if (currentFuel >= fuelNeededToFinish + safetyLitres) break;
 
-    // Find reachable stations from current position
-    const maxRange = currentFuel * kmPerLitre;
-    const reachable = routeStations.filter(
-      (s) => s.along > currentKm + 1 && s.along <= currentKm + maxRange
+    // How far can we drive with current fuel (minus safety)?
+    const usableFuel = currentFuel - safetyLitres;
+    const maxRangeKm = usableFuel * kmPerLitre;
+
+    // Find reachable stations that are far enough from our last stop
+    const reachable = dedupedStations.filter(
+      (s) =>
+        s.along > currentKm + 5 && // at least 5km ahead
+        s.along <= currentKm + maxRangeKm && // within safe range
+        s.along - lastStopKm >= minStopGap // respect minimum gap (unless emergency)
     );
 
-    if (reachable.length === 0) {
-      warnings.push(
-        `Warning: No reachable station at km ${Math.round(currentKm)}. ` +
-          `You may need more fuel capacity for this route.`
+    // If no stations respect the gap, relax the gap constraint (emergency)
+    const candidates = reachable.length > 0
+      ? reachable
+      : dedupedStations.filter(
+          (s) => s.along > currentKm + 5 && s.along <= currentKm + maxRangeKm
+        );
+
+    if (candidates.length === 0) {
+      // Try with full fuel (ignore safety) as last resort
+      const desperate = dedupedStations.filter(
+        (s) => s.along > currentKm + 1 && s.along <= currentKm + currentFuel * kmPerLitre
       );
-      break;
+      if (desperate.length === 0) {
+        warnings.push(
+          `Warning: No reachable station from km ${Math.round(currentKm)}. ` +
+            `Range: ${Math.round(currentFuel * kmPerLitre)} km. ` +
+            `You may need more fuel capacity for this route.`
+        );
+        break;
+      }
+      // Emergency: stop at the furthest-along cheap station
+      const emergencyStop = desperate.reduce((best, s) => (s.price < best.price ? s : best));
+      const fuelUsed = (emergencyStop.along - currentKm) / kmPerLitre;
+      const fuelOnArrival = currentFuel - fuelUsed;
+      const litresAdded = totalCapacity - fuelOnArrival;
+
+      stops.push({
+        station: emergencyStop.station,
+        distanceFromStart: emergencyStop.along,
+        fuelOnArrival,
+        litresAdded,
+        fuelOnDeparture: totalCapacity,
+        cost: (litresAdded * emergencyStop.price) / 100,
+        pricePerLitre: emergencyStop.price,
+      });
+      currentFuel = totalCapacity;
+      currentKm = emergencyStop.along;
+      lastStopKm = emergencyStop.along;
+      continue;
     }
 
-    // Look ahead: find cheapest station within range
-    // But also check if we MUST stop soon (fuel getting low)
-    const mustStopThreshold = currentKm + (currentFuel - safetyMargin) * kmPerLitre;
+    // Find cheapest among candidates
+    const cheapest = candidates.reduce((best, s) => (s.price < best.price ? s : best));
 
-    // Find cheapest among reachable
-    const cheapest = reachable.reduce((best, s) => (s.price < best.price ? s : best));
-
-    // If we're running low, stop at the cheapest available
-    // Otherwise, check if there's something cheaper further ahead
-    let chosenStop = cheapest;
-
-    // How much fuel to add?
-    const fuelUsedToStop = (chosenStop.along - currentKm) / kmPerLitre;
+    const fuelUsedToStop = (cheapest.along - currentKm) / kmPerLitre;
     const fuelOnArrival = currentFuel - fuelUsedToStop;
 
-    // Look ahead from this stop — what's the cheapest within one tank range?
-    const futureStations = routeStations.filter(
-      (s) => s.along > chosenStop.along && s.along <= chosenStop.along + totalCapacity * kmPerLitre
+    // Look ahead: is there a significantly cheaper station within one tank range?
+    const futureStations = dedupedStations.filter(
+      (s) => s.along > cheapest.along + minStopGap &&
+             s.along <= cheapest.along + totalCapacity * kmPerLitre
     );
-    const cheaperAhead = futureStations.some((s) => s.price < chosenStop.price * 0.95);
+    const cheaperAhead = futureStations.find(
+      (s) => s.price < cheapest.price * 0.95
+    );
 
-    // If cheaper ahead, only fill enough to reach it; otherwise fill to brim
+    // Decide how much to fill
     let litresAdded: number;
-    if (cheaperAhead && futureStations.length > 0) {
-      const nextCheap = futureStations.reduce((best, s) => (s.price < best.price ? s : best));
-      const fuelNeededToReachCheap = (nextCheap.along - chosenStop.along) / kmPerLitre + safetyMargin;
+    if (cheaperAhead) {
+      // Fill just enough to reach the cheaper station (with safety margin)
+      const fuelNeededToReachCheap = (cheaperAhead.along - cheapest.along) / kmPerLitre + safetyLitres;
       litresAdded = Math.max(0, fuelNeededToReachCheap - fuelOnArrival);
     } else {
+      // Fill to full — this is the best price around
       litresAdded = totalCapacity - fuelOnArrival;
     }
 
     litresAdded = Math.min(litresAdded, totalCapacity - fuelOnArrival);
+
+    // Skip this stop if we'd add less than minimum fill AND we have enough fuel
+    // to reach another station further ahead
+    if (litresAdded < minFill) {
+      const canReachFurther = dedupedStations.some(
+        (s) => s.along > cheapest.along + minStopGap &&
+               s.along <= currentKm + currentFuel * kmPerLitre
+      );
+      if (canReachFurther) {
+        // Skip this stop — drive on with current fuel
+        currentKm = cheapest.along + 1; // advance past this station
+        continue;
+      }
+      // No choice — must stop here even for a small fill
+      litresAdded = Math.max(litresAdded, Math.min(minFill, totalCapacity - fuelOnArrival));
+    }
+
     litresAdded = Math.max(0, litresAdded);
 
     stops.push({
-      station: chosenStop.station,
-      distanceFromStart: chosenStop.along,
+      station: cheapest.station,
+      distanceFromStart: cheapest.along,
       fuelOnArrival,
       litresAdded,
       fuelOnDeparture: fuelOnArrival + litresAdded,
-      cost: (litresAdded * chosenStop.price) / 100,
-      pricePerLitre: chosenStop.price,
+      cost: (litresAdded * cheapest.price) / 100,
+      pricePerLitre: cheapest.price,
     });
 
     currentFuel = fuelOnArrival + litresAdded;
-    currentKm = chosenStop.along;
+    currentKm = cheapest.along;
+    lastStopKm = cheapest.along;
   }
 
   const totalFuelCost = stops.reduce((sum, s) => sum + s.cost, 0);

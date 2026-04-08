@@ -13,7 +13,7 @@ export default function FuelSelect({ value, onChange }: Props) {
     <select
       value={value}
       onChange={(e) => onChange(e.target.value as FuelCode)}
-      className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-medium shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+      className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-gray-900 text-sm font-medium shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
     >
       {FUEL_TYPES.map((f) => (
         <option key={f.code} value={f.code}>
