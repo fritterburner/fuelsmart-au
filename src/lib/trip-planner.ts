@@ -277,12 +277,15 @@ function planOptimised(
     litresAdded = Math.min(litresAdded, totalCapacity - fuelOnArrival);
 
     if (litresAdded < minFill) {
+      // Check if we can reach further stations with the fuel we'd have at this point
       const canReachFurther = deduped.some(
         (s) =>
           s.along > cheapest.along + minStopGap &&
-          s.along <= currentKm + currentFuel * kmPerLitre
+          s.along <= cheapest.along + fuelOnArrival * kmPerLitre
       );
       if (canReachFurther) {
+        // Skip this station — but track fuel burned driving here
+        currentFuel = fuelOnArrival;
         currentKm = cheapest.along + 1;
         continue;
       }
