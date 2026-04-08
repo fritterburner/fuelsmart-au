@@ -14,9 +14,7 @@ export default function LocationSearch({ onSelect }: Props) {
   async function search() {
     if (!query.trim()) return;
     setSearching(true);
-    const resp = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query + " Australia")}&format=json&limit=5&addressdetails=1`
-    );
+    const resp = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
     const data = await resp.json();
     setResults(data);
     setSearching(false);

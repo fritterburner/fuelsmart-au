@@ -19,9 +19,7 @@ interface Props {
 }
 
 async function geocode(query: string): Promise<[number, number] | null> {
-  const resp = await fetch(
-    `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query + " Australia")}&format=json&limit=1`
-  );
+  const resp = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
   const data = await resp.json();
   if (data.length === 0) return null;
   return [Number(data[0].lat), Number(data[0].lon)];

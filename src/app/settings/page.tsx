@@ -25,9 +25,7 @@ export default function SettingsPage() {
 
   async function geocodeHome() {
     if (!homeQuery.trim()) return;
-    const resp = await fetch(
-      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(homeQuery + " Australia")}&format=json&limit=1`
-    );
+    const resp = await fetch(`/api/geocode?q=${encodeURIComponent(homeQuery)}`);
     const data = await resp.json();
     if (data.length > 0) {
       set("homeLat", Number(data[0].lat));
