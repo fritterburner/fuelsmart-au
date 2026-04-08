@@ -50,6 +50,8 @@ export default function TripMap({ comparison, selectedStrategy }: Props) {
             <div className="text-sm">
               <strong>Stop {i + 1}: {stop.station.name}</strong>
               <br />
+              <span className="text-gray-500">{stop.distanceFromStart.toFixed(0)} km from start</span>
+              <br />
               {stop.pricePerLitre.toFixed(1)} c/L &middot; Add {stop.litresAdded.toFixed(1)}L &middot; ${stop.cost.toFixed(2)}
               <br />
               <span className="text-gray-500">
