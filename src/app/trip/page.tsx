@@ -24,6 +24,7 @@ export default function TripPage() {
     jerry: number;
     startingFuelPct: number;
     allowFallback: boolean;
+    arriveFull: boolean;
   }) {
     setLoading(true);
     setError("");
@@ -39,6 +40,7 @@ export default function TripPage() {
       jerry: String(data.jerry),
       startFuel: String(data.startingFuelPct),
       ...(!data.allowFallback ? { fallback: "0" } : {}),
+      ...(data.arriveFull ? { arriveFull: "1" } : {}),
     });
 
     if (data.viaCoords.length > 0) {

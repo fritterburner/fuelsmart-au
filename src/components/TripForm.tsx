@@ -15,6 +15,7 @@ interface TripFormData {
   jerry: number;
   startingFuelPct: number;
   allowFallback: boolean;
+  arriveFull: boolean;
 }
 
 interface Props {
@@ -37,6 +38,7 @@ export default function TripForm({ onSubmit, loading }: Props) {
     jerry: 0,
     startingFuelPct: 100,
     allowFallback: true,
+    arriveFull: false,
   });
 
   // Store confirmed coordinates for each location
@@ -271,6 +273,23 @@ export default function TripForm({ onSubmit, loading }: Props) {
           </span>
         </label>
       )}
+
+      {/* Arrive with full tank toggle */}
+      <label className="flex items-center gap-3 cursor-pointer">
+        <div className="relative">
+          <input
+            type="checkbox"
+            checked={form.arriveFull}
+            onChange={(e) => set("arriveFull", e.target.checked)}
+            className="sr-only peer"
+          />
+          <div className="w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-emerald-500 transition-colors" />
+          <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform" />
+        </div>
+        <span className="text-sm text-gray-700">
+          Arrive with full tank (stock up at cheapest stops)
+        </span>
+      </label>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
 

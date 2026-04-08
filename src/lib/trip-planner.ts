@@ -11,6 +11,7 @@ interface TripParams {
   totalDistance: number; // km
   startingFuelPct?: number; // 0-100, defaults to 100
   allowFallback?: boolean; // use LAF/OPAL when primary fuel unavailable
+  arriveFull?: boolean; // fill to brim at cheapest stops (arrive with max fuel)
 }
 
 // Haversine distance in km
@@ -215,7 +216,8 @@ function planOptimised(
   totalCapacity: number,
   kmPerLitre: number,
   totalDistance: number,
-  startingFuel: number
+  startingFuel: number,
+  arriveFull: boolean = false
 ): { stops: TripStop[]; warnings: string[] } {
   const safetyLitres = Math.max(totalCapacity * 0.20, 30 / kmPerLitre);
   const minFill = Math.max(15, totalCapacity * 0.20);
@@ -308,6 +310,20 @@ function planOptimised(
     }
 
     litresAdded = Math.max(0, litresAdded);
+
+    // Don't buy more fuel than needed to finish the trip (unless arriveFull)
+    if (!arriveFull) {
+      const fuelToFinish = (totalDistance - cheapest.along) / kmPerLitre + safetyLitres;
+      litresAdded = Math.min(litresAdded, Math.max(0, fuelToFinish - fuelOnArrival));
+    }
+
+    // Skip if the capped fill is negligible
+    if (litresAdded < 1) {
+      currentFuel = fuelOnArrival;
+      currentKm = cheapest.along + 1;
+      continue;
+    }
+
     stops.push(makeStop(cheapest, currentKm, currentFuel, kmPerLitre, litresAdded));
     currentFuel = fuelOnArrival + litresAdded;
     currentKm = cheapest.along;
@@ -449,7 +465,7 @@ function buildStrategyResult(
     no_planning: "No Planning",
   };
   const descriptions = {
-    optimised: "Smart partial fills — skips expensive stations, buys less at pricey stops",
+    optimised: "Buys only what you need at the cheapest stations — lowest trip cost",
     cheapest_fill: "Always drives to the cheapest reachable station and fills to brim",
     no_planning: "Drives until the fuel light comes on, pulls into the next servo, fills to full",
   };
@@ -518,7 +534,7 @@ export function planTripComparison(params: TripParams): TripComparison {
     );
   }
 
-  const optimised = planOptimised(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel);
+  const optimised = planOptimised(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel, params.arriveFull);
   const cheapestFill = planCheapestFill(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel);
   const noPlanning = planNoPlanning(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel);
 
