@@ -17,6 +17,7 @@ export default function TripPage() {
   async function handleSubmit(data: {
     originCoords: [number, number];
     destCoords: [number, number];
+    viaCoords: [number, number][];
     fuel: FuelCode;
     tank: number;
     consumption: number;
@@ -37,6 +38,10 @@ export default function TripPage() {
       jerry: String(data.jerry),
       startFuel: String(data.startingFuelPct),
     });
+
+    if (data.viaCoords.length > 0) {
+      params.set("via", data.viaCoords.map((c) => c.join(",")).join("|"));
+    }
 
     const resp = await fetch(`/api/trip-plan?${params}`);
     const result = await resp.json();

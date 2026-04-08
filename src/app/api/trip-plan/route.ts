@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const origin = params.get("origin");
   const dest = params.get("dest");
+  const via = params.get("via");
   const fuel = (params.get("fuel") || "U91") as FuelCode;
   const tank = Number(params.get("tank") || 45);
   const consumption = Number(params.get("consumption") || 10.5);
@@ -17,11 +18,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "origin and dest required" }, { status: 400 });
   }
 
-  // Get route from OSRM
+  // Parse origin, destination, and via points
   const [oLat, oLng] = origin.split(",").map(Number);
   const [dLat, dLng] = dest.split(",").map(Number);
 
-  const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${oLng},${oLat};${dLng},${dLat}?overview=full&geometries=geojson`;
+  // Build OSRM waypoints string: origin;via1;via2;...;dest (lng,lat format)
+  const waypoints: string[] = [`${oLng},${oLat}`];
+
+  if (via) {
+    const viaPairs = via.split("|");
+    for (const pair of viaPairs) {
+      const [lat, lng] = pair.split(",").map(Number);
+      waypoints.push(`${lng},${lat}`);
+    }
+  }
+
+  waypoints.push(`${dLng},${dLat}`);
+
+  const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${waypoints.join(";")}?overview=full&geometries=geojson`;
   const routeResp = await fetch(osrmUrl);
   const routeData = await routeResp.json();
 
