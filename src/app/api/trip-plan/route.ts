@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCachedStations } from "@/lib/cache";
-import { planTrip } from "@/lib/trip-planner";
+import { planTripComparison } from "@/lib/trip-planner";
 import { FuelCode } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "No station data available" }, { status: 503 });
   }
 
-  const plan = planTrip({
+  const comparison = planTripComparison({
     fuel,
     tankSize: tank,
     consumption,
@@ -50,5 +50,5 @@ export async function GET(request: NextRequest) {
     totalDistance,
   });
 
-  return NextResponse.json(plan);
+  return NextResponse.json(comparison);
 }

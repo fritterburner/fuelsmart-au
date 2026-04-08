@@ -4,12 +4,13 @@ import { useState } from "react";
 import dynamic from "next/dynamic";
 import TripForm from "@/components/TripForm";
 import TripResults from "@/components/TripResults";
-import { TripPlan, FuelCode } from "@/lib/types";
+import { TripComparison, TripStrategy, FuelCode } from "@/lib/types";
 
 const TripMap = dynamic(() => import("@/components/TripMap"), { ssr: false });
 
 export default function TripPage() {
-  const [plan, setPlan] = useState<TripPlan | null>(null);
+  const [comparison, setComparison] = useState<TripComparison | null>(null);
+  const [selectedStrategy, setSelectedStrategy] = useState<TripStrategy>("optimised");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -23,7 +24,8 @@ export default function TripPage() {
   }) {
     setLoading(true);
     setError("");
-    setPlan(null);
+    setComparison(null);
+    setSelectedStrategy("optimised");
 
     const params = new URLSearchParams({
       origin: data.originCoords.join(","),
@@ -38,7 +40,7 @@ export default function TripPage() {
     const result = await resp.json();
 
     if (resp.ok) {
-      setPlan(result);
+      setComparison(result);
     } else {
       setError(result.error || "Failed to plan trip");
     }
@@ -52,17 +54,21 @@ export default function TripPage() {
         <h1 className="font-bold text-lg">Trip Planner</h1>
       </div>
 
-      <div className="max-w-4xl mx-auto p-4 space-y-6">
+      <div className="max-w-5xl mx-auto p-4 space-y-6">
         <TripForm onSubmit={handleSubmit} loading={loading} />
 
         {error && <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-red-800">{error}</div>}
 
-        {plan && (
+        {comparison && (
           <>
-            <div className="h-96 rounded-lg overflow-hidden border">
-              <TripMap plan={plan} />
+            <div className="h-96 rounded-xl overflow-hidden border shadow-sm">
+              <TripMap comparison={comparison} selectedStrategy={selectedStrategy} />
             </div>
-            <TripResults plan={plan} />
+            <TripResults
+              comparison={comparison}
+              onStrategyChange={setSelectedStrategy}
+              selectedStrategy={selectedStrategy}
+            />
           </>
         )}
       </div>

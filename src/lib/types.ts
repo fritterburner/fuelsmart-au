@@ -55,3 +55,24 @@ export interface TripPlan {
   routeGeometry: [number, number][]; // lat/lng pairs
   warnings: string[];
 }
+
+export type TripStrategy = "optimised" | "cheapest_fill" | "no_planning";
+
+export interface StrategyResult {
+  strategy: TripStrategy;
+  label: string;
+  description: string;
+  totalFuelCost: number; // dollars
+  totalLitres: number;
+  avgPricePerLitre: number; // cents
+  stops: TripStop[];
+  warnings: string[];
+}
+
+export interface TripComparison {
+  origin: { lat: number; lng: number; label: string };
+  destination: { lat: number; lng: number; label: string };
+  totalDistance: number; // km
+  routeGeometry: [number, number][];
+  strategies: StrategyResult[];
+}
