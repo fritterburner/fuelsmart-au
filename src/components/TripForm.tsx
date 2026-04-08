@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FuelCode } from "@/lib/types";
 import { FUEL_TYPES } from "@/lib/fuel-codes";
+import LocationInput from "./LocationInput";
 
 interface TripFormData {
   originQuery: string;
@@ -24,13 +25,6 @@ interface Props {
   loading: boolean;
 }
 
-async function geocode(query: string): Promise<[number, number] | null> {
-  const resp = await fetch(`/api/geocode?q=${encodeURIComponent(query)}`);
-  const data = await resp.json();
-  if (data.length === 0) return null;
-  return [Number(data[0].lat), Number(data[0].lon)];
-}
-
 export default function TripForm({ onSubmit, loading }: Props) {
   const [form, setForm] = useState<TripFormData>({
     originQuery: "",
@@ -42,37 +36,37 @@ export default function TripForm({ onSubmit, loading }: Props) {
     jerry: 0,
     startingFuelPct: 100,
   });
+
+  // Store confirmed coordinates for each location
+  const [originCoords, setOriginCoords] = useState<[number, number] | null>(null);
+  const [destCoords, setDestCoords] = useState<[number, number] | null>(null);
+  const [viaCoords, setViaCoords] = useState<([number, number] | null)[]>([]);
+
   const [error, setError] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
+  function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
 
-    const geocodePromises = [
-      geocode(form.originQuery),
-      geocode(form.destQuery),
-      ...form.viaQueries.map((q) => geocode(q)),
-    ];
-
-    const results = await Promise.all(geocodePromises);
-
-    const originCoords = results[0];
-    const destCoords = results[1];
-    const viaResults = results.slice(2);
-
-    if (!originCoords) { setError("Could not find origin location"); return; }
-    if (!destCoords) { setError("Could not find destination location"); return; }
-
-    const viaCoords: [number, number][] = [];
-    for (let i = 0; i < viaResults.length; i++) {
-      if (!viaResults[i]) {
-        setError(`Could not find via point ${i + 1}`);
-        return;
-      }
-      viaCoords.push(viaResults[i]!);
+    if (!originCoords) {
+      setError("Please select an origin from the search results");
+      return;
+    }
+    if (!destCoords) {
+      setError("Please select a destination from the search results");
+      return;
     }
 
-    onSubmit({ ...form, originCoords, destCoords, viaCoords });
+    const confirmedVia: [number, number][] = [];
+    for (let i = 0; i < viaCoords.length; i++) {
+      if (!viaCoords[i]) {
+        setError(`Please select via point ${i + 1} from the search results`);
+        return;
+      }
+      confirmedVia.push(viaCoords[i]!);
+    }
+
+    onSubmit({ ...form, originCoords, destCoords, viaCoords: confirmedVia });
   }
 
   const set = (field: keyof TripFormData, value: any) =>
@@ -81,6 +75,7 @@ export default function TripForm({ onSubmit, loading }: Props) {
   const addVia = () => {
     if (form.viaQueries.length >= 5) return;
     setForm((f) => ({ ...f, viaQueries: [...f.viaQueries, ""] }));
+    setViaCoords((v) => [...v, null]);
   };
 
   const removeVia = (index: number) => {
@@ -88,13 +83,16 @@ export default function TripForm({ onSubmit, loading }: Props) {
       ...f,
       viaQueries: f.viaQueries.filter((_, i) => i !== index),
     }));
+    setViaCoords((v) => v.filter((_, i) => i !== index));
   };
 
-  const setVia = (index: number, value: string) => {
+  const setViaQuery = (index: number, value: string) => {
     setForm((f) => ({
       ...f,
       viaQueries: f.viaQueries.map((q, i) => (i === index ? value : q)),
     }));
+    // Clear confirmed coords when user edits text
+    setViaCoords((v) => v.map((c, i) => (i === index ? null : c)));
   };
 
   const startingLitres = Math.round(form.startingFuelPct / 100 * form.tank);
@@ -104,13 +102,19 @@ export default function TripForm({ onSubmit, loading }: Props) {
       {/* Origin */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Origin</label>
-        <input
-          type="text"
+        <LocationInput
           value={form.originQuery}
-          onChange={(e) => set("originQuery", e.target.value)}
+          onChange={(v) => {
+            set("originQuery", v);
+            setOriginCoords(null); // clear coords when user types
+          }}
+          onSelect={(lat, lng, label) => {
+            set("originQuery", label);
+            setOriginCoords([lat, lng]);
+          }}
           placeholder="e.g. Darwin"
-          className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
           required
+          confirmed={!!originCoords}
         />
       </div>
 
@@ -121,13 +125,19 @@ export default function TripForm({ onSubmit, loading }: Props) {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Via {i + 1}
             </label>
-            <input
-              type="text"
+            <LocationInput
               value={q}
-              onChange={(e) => setVia(i, e.target.value)}
+              onChange={(v) => setViaQuery(i, v)}
+              onSelect={(lat, lng, label) => {
+                setForm((f) => ({
+                  ...f,
+                  viaQueries: f.viaQueries.map((qq, ii) => (ii === i ? label : qq)),
+                }));
+                setViaCoords((v) => v.map((c, ii) => (ii === i ? [lat, lng] as [number, number] : c)));
+              }}
               placeholder="e.g. Katherine"
-              className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
               required
+              confirmed={!!viaCoords[i]}
             />
           </div>
           <button
@@ -154,13 +164,19 @@ export default function TripForm({ onSubmit, loading }: Props) {
       {/* Destination */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Destination</label>
-        <input
-          type="text"
+        <LocationInput
           value={form.destQuery}
-          onChange={(e) => set("destQuery", e.target.value)}
+          onChange={(v) => {
+            set("destQuery", v);
+            setDestCoords(null);
+          }}
+          onSelect={(lat, lng, label) => {
+            set("destQuery", label);
+            setDestCoords([lat, lng]);
+          }}
           placeholder="e.g. Cairns"
-          className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
           required
+          confirmed={!!destCoords}
         />
       </div>
 
