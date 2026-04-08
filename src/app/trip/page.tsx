@@ -21,6 +21,7 @@ export default function TripPage() {
     tank: number;
     consumption: number;
     jerry: number;
+    startingFuelPct: number;
   }) {
     setLoading(true);
     setError("");
@@ -34,6 +35,7 @@ export default function TripPage() {
       tank: String(data.tank),
       consumption: String(data.consumption),
       jerry: String(data.jerry),
+      startFuel: String(data.startingFuelPct),
     });
 
     const resp = await fetch(`/api/trip-plan?${params}`);

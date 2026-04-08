@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
   const tank = Number(params.get("tank") || 45);
   const consumption = Number(params.get("consumption") || 10.5);
   const jerry = Number(params.get("jerry") || 0);
+  const startFuel = Number(params.get("startFuel") || 100);
 
   if (!origin || !dest) {
     return NextResponse.json({ error: "origin and dest required" }, { status: 400 });
@@ -48,6 +49,7 @@ export async function GET(request: NextRequest) {
     routeGeometry,
     stations,
     totalDistance,
+    startingFuelPct: startFuel,
   });
 
   return NextResponse.json(comparison);

@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import FuelSelect from "@/components/FuelSelect";
 import LocationSearch from "@/components/LocationSearch";
 import { FuelCode } from "@/lib/types";
@@ -12,6 +12,19 @@ const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
 export default function Home() {
   const [fuel, setFuel] = useState<FuelCode>("U91");
   const [flyTo, setFlyTo] = useState<[number, number] | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [menuOpen]);
 
   return (
     <div className="h-dvh flex flex-col">
@@ -33,24 +46,49 @@ export default function Home() {
           {/* Spacer pushes action buttons right */}
           <div className="flex-1 md:flex-none" />
 
-          {/* Trip Planner — icon on mobile, button on md+ */}
+          {/* Mobile: three-dot menu */}
+          <div className="relative md:hidden" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen((prev) => !prev)}
+              className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg bg-slate-700 active:bg-slate-600 transition-colors"
+              aria-label="Menu"
+              aria-expanded={menuOpen}
+            >
+              <span className="text-xl leading-none">&#8942;</span>
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-1 w-48 bg-slate-700 rounded-lg shadow-lg overflow-hidden z-[1100]">
+                <a
+                  href="/trip"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                >
+                  <span aria-hidden="true">🚗</span> Trip Planner
+                </a>
+                <a
+                  href="/settings"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                >
+                  <span aria-hidden="true">⚙️</span> Settings
+                </a>
+              </div>
+            )}
+          </div>
+
+          {/* Desktop: inline text buttons */}
           <a
             href="/trip"
-            className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg bg-emerald-600 active:bg-emerald-700 md:hover:bg-emerald-700 md:px-4 md:py-2 transition-colors"
+            className="hidden md:inline-flex items-center justify-center rounded-lg bg-emerald-600 md:hover:bg-emerald-700 md:px-4 md:py-2 transition-colors"
             title="Trip Planner"
           >
-            <span className="text-lg md:hidden" aria-hidden="true">&#9889;</span>
-            <span className="hidden md:inline text-sm font-medium">Trip Planner</span>
+            <span className="text-sm font-medium">🚗 Trip Planner</span>
           </a>
 
-          {/* Settings — icon on mobile, text on md+ */}
           <a
             href="/settings"
-            className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg bg-slate-700 active:bg-slate-600 md:hover:bg-slate-600 md:px-3 md:py-2 transition-colors"
+            className="hidden md:inline-flex items-center justify-center rounded-lg bg-slate-700 md:hover:bg-slate-600 md:px-3 md:py-2 transition-colors"
             title="Settings"
           >
-            <span className="text-lg md:hidden" aria-hidden="true">&#9881;</span>
-            <span className="hidden md:inline text-sm font-medium">Settings</span>
+            <span className="text-sm font-medium">Settings</span>
           </a>
         </div>
 

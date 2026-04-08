@@ -8,6 +8,7 @@ interface TripParams {
   routeGeometry: [number, number][]; // [lat, lng] pairs
   stations: Station[];
   totalDistance: number; // km
+  startingFuelPct?: number; // 0-100, defaults to 100
 }
 
 // Haversine distance in km
@@ -111,7 +112,8 @@ function planOptimised(
   deduped: RouteStation[],
   totalCapacity: number,
   kmPerLitre: number,
-  totalDistance: number
+  totalDistance: number,
+  startingFuel: number
 ): { stops: TripStop[]; warnings: string[] } {
   const safetyLitres = Math.max(totalCapacity * 0.20, 30 / kmPerLitre);
   const minFill = Math.max(15, totalCapacity * 0.20);
@@ -119,7 +121,7 @@ function planOptimised(
 
   const warnings: string[] = [];
   const stops: TripStop[] = [];
-  let currentFuel = totalCapacity;
+  let currentFuel = startingFuel;
   let currentKm = 0;
   let lastStopKm = -minStopGap;
 
@@ -216,14 +218,15 @@ function planCheapestFill(
   deduped: RouteStation[],
   totalCapacity: number,
   kmPerLitre: number,
-  totalDistance: number
+  totalDistance: number,
+  startingFuel: number
 ): { stops: TripStop[]; warnings: string[] } {
   const safetyLitres = Math.max(totalCapacity * 0.20, 30 / kmPerLitre);
   const minStopGap = 50;
 
   const warnings: string[] = [];
   const stops: TripStop[] = [];
-  let currentFuel = totalCapacity;
+  let currentFuel = startingFuel;
   let currentKm = 0;
   let lastStopKm = -minStopGap;
 
@@ -276,7 +279,8 @@ function planNoPlanning(
   deduped: RouteStation[],
   totalCapacity: number,
   kmPerLitre: number,
-  totalDistance: number
+  totalDistance: number,
+  startingFuel: number
 ): { stops: TripStop[]; warnings: string[] } {
   // Fuel light comes on at ~1/8 tank (12.5%). Driver pulls into the next servo.
   const fuelLightThreshold = totalCapacity * 0.125;
@@ -284,7 +288,7 @@ function planNoPlanning(
 
   const warnings: string[] = [];
   const stops: TripStop[] = [];
-  let currentFuel = totalCapacity;
+  let currentFuel = startingFuel;
   let currentKm = 0;
 
   while (currentKm < totalDistance) {
@@ -369,14 +373,16 @@ function buildStrategyResult(
 export function planTripComparison(params: TripParams): TripComparison {
   const { fuel, tankSize, consumption, jerryCapacity, routeGeometry, stations, totalDistance } =
     params;
+  const startingFuelPct = params.startingFuelPct ?? 100;
   const totalCapacity = tankSize + jerryCapacity;
   const kmPerLitre = 100 / consumption;
+  const startingFuel = totalCapacity * (startingFuelPct / 100);
 
   const { deduped } = prepareRouteStations(stations, fuel, routeGeometry, totalDistance);
 
-  const optimised = planOptimised(deduped, totalCapacity, kmPerLitre, totalDistance);
-  const cheapestFill = planCheapestFill(deduped, totalCapacity, kmPerLitre, totalDistance);
-  const noPlanning = planNoPlanning(deduped, totalCapacity, kmPerLitre, totalDistance);
+  const optimised = planOptimised(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel);
+  const cheapestFill = planCheapestFill(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel);
+  const noPlanning = planNoPlanning(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel);
 
   return {
     origin: { lat: routeGeometry[0][0], lng: routeGeometry[0][1], label: "Origin" },

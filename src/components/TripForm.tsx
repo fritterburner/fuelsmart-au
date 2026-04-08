@@ -11,6 +11,7 @@ interface TripFormData {
   tank: number;
   consumption: number;
   jerry: number;
+  startingFuelPct: number;
 }
 
 interface Props {
@@ -33,6 +34,7 @@ export default function TripForm({ onSubmit, loading }: Props) {
     tank: 45,
     consumption: 10.5,
     jerry: 0,
+    startingFuelPct: 100,
   });
   const [error, setError] = useState("");
 
@@ -53,6 +55,8 @@ export default function TripForm({ onSubmit, loading }: Props) {
 
   const set = (field: keyof TripFormData, value: any) =>
     setForm((f) => ({ ...f, [field]: value }));
+
+  const startingLitres = Math.round(form.startingFuelPct / 100 * form.tank);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
@@ -79,6 +83,27 @@ export default function TripForm({ onSubmit, loading }: Props) {
             className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
             required
           />
+        </div>
+      </div>
+
+      {/* Starting Fuel Level slider */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Starting Fuel Level
+        </label>
+        <div className="flex items-center gap-3">
+          <input
+            type="range"
+            min={0}
+            max={100}
+            step={5}
+            value={form.startingFuelPct}
+            onChange={(e) => set("startingFuelPct", Number(e.target.value))}
+            className="flex-1 min-h-[44px] accent-emerald-600"
+          />
+          <span className="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[110px] text-right">
+            {form.startingFuelPct}% ({startingLitres}L of {form.tank}L)
+          </span>
         </div>
       </div>
 
