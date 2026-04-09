@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { FuelCode } from "@/lib/types";
+import { useState, useEffect } from "react";
+import { FuelCode, VehicleProfile } from "@/lib/types";
 import { FUEL_TYPES, FUEL_FALLBACKS } from "@/lib/fuel-codes";
+import { loadVehicles, saveVehicle, deleteVehicle } from "@/lib/vehicles";
 import LocationInput from "./LocationInput";
 
 interface TripFormData {
@@ -50,6 +51,134 @@ export default function TripForm({ onSubmit, loading }: Props) {
 
   const [error, setError] = useState("");
 
+  // ─── Saved Vehicles ───────────────────────────────────────────────────────
+  const [vehicles, setVehicles] = useState<VehicleProfile[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string>("");
+
+  useEffect(() => {
+    setVehicles(loadVehicles());
+  }, []);
+
+  function handleSelectVehicle(id: string) {
+    setSelectedVehicleId(id);
+    if (!id) return; // "Custom" selected
+    const v = vehicles.find((veh) => veh.id === id);
+    if (v) {
+      setForm((f) => ({
+        ...f,
+        fuel: v.fuel,
+        tank: v.tankSize,
+        consumption: v.consumption,
+        jerry: v.jerryCapacity,
+      }));
+    }
+  }
+
+  function handleSaveVehicle() {
+    const name = window.prompt("Vehicle name (e.g. Hilux, Camry):");
+    if (!name?.trim()) return;
+    const profile: VehicleProfile = {
+      id: crypto.randomUUID(),
+      name: name.trim(),
+      fuel: form.fuel,
+      tankSize: form.tank,
+      consumption: form.consumption,
+      jerryCapacity: form.jerry,
+    };
+    const updated = saveVehicle(profile);
+    setVehicles(updated);
+    setSelectedVehicleId(profile.id);
+  }
+
+  function handleDeleteVehicle() {
+    if (!selectedVehicleId) return;
+    const v = vehicles.find((veh) => veh.id === selectedVehicleId);
+    if (!v) return;
+    if (!window.confirm(`Delete "${v.name}"?`)) return;
+    const updated = deleteVehicle(selectedVehicleId);
+    setVehicles(updated);
+    setSelectedVehicleId("");
+  }
+
+  // Clear vehicle selection when manually changing vehicle fields
+  function setVehicleField(field: keyof TripFormData, value: any) {
+    setSelectedVehicleId("");
+    setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  // ─── Google Maps Import ───────────────────────────────────────────────────
+  const [gmapsUrl, setGmapsUrl] = useState("");
+  const [gmapsLoading, setGmapsLoading] = useState(false);
+  const [gmapsError, setGmapsError] = useState("");
+
+  async function handleGmapsImport() {
+    const url = gmapsUrl.trim();
+    if (!url) return;
+    setGmapsLoading(true);
+    setGmapsError("");
+    try {
+      const resp = await fetch(`/api/parse-gmaps?url=${encodeURIComponent(url)}`);
+      const data = await resp.json();
+      if (!resp.ok) {
+        setGmapsError(data.error || "Failed to parse URL");
+        setGmapsLoading(false);
+        return;
+      }
+      const wps: { label: string; lat?: number; lng?: number }[] = data.waypoints;
+      if (wps.length < 2) {
+        setGmapsError("Need at least an origin and destination");
+        setGmapsLoading(false);
+        return;
+      }
+      // First = origin, last = destination, middle = via points
+      const origin = wps[0];
+      const dest = wps[wps.length - 1];
+      const vias = wps.slice(1, -1);
+
+      setForm((f) => ({
+        ...f,
+        originQuery: origin.label,
+        destQuery: dest.label,
+        viaQueries: vias.map((v) => v.label),
+      }));
+
+      if (origin.lat !== undefined && origin.lng !== undefined) {
+        setOriginCoords([origin.lat, origin.lng]);
+      } else {
+        setOriginCoords(null);
+      }
+      if (dest.lat !== undefined && dest.lng !== undefined) {
+        setDestCoords([dest.lat, dest.lng]);
+      } else {
+        setDestCoords(null);
+      }
+      setViaCoords(
+        vias.map((v) =>
+          v.lat !== undefined && v.lng !== undefined ? [v.lat, v.lng] as [number, number] : null
+        )
+      );
+      setGmapsUrl("");
+    } catch {
+      setGmapsError("Failed to import route");
+    }
+    setGmapsLoading(false);
+  }
+
+  // ─── Return Trip ──────────────────────────────────────────────────────────
+  function handleSwapRoute() {
+    setForm((f) => ({
+      ...f,
+      originQuery: f.destQuery,
+      destQuery: f.originQuery,
+      viaQueries: [...f.viaQueries].reverse(),
+    }));
+    const tmpCoords = originCoords;
+    setOriginCoords(destCoords);
+    setDestCoords(tmpCoords);
+    setViaCoords((v) => [...v].reverse());
+  }
+
+  // ─── Submit ───────────────────────────────────────────────────────────────
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -105,6 +234,31 @@ export default function TripForm({ onSubmit, loading }: Props) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
+      {/* Google Maps Import — collapsible */}
+      <details className="group">
+        <summary className="text-sm font-medium text-emerald-700 cursor-pointer hover:text-emerald-800 select-none">
+          Import from Google Maps
+        </summary>
+        <div className="mt-2 flex gap-2">
+          <input
+            type="text"
+            value={gmapsUrl}
+            onChange={(e) => setGmapsUrl(e.target.value)}
+            placeholder="Paste a Google Maps URL..."
+            className="flex-1 px-3 py-2.5 min-h-[44px] border rounded-lg text-sm"
+          />
+          <button
+            type="button"
+            onClick={handleGmapsImport}
+            disabled={gmapsLoading || !gmapsUrl.trim()}
+            className="px-4 py-2.5 min-h-[44px] bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors whitespace-nowrap"
+          >
+            {gmapsLoading ? "Importing..." : "Import"}
+          </button>
+        </div>
+        {gmapsError && <p className="text-red-600 text-xs mt-1">{gmapsError}</p>}
+      </details>
+
       {/* Origin */}
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-1">Origin</label>
@@ -157,15 +311,31 @@ export default function TripForm({ onSubmit, loading }: Props) {
         </div>
       ))}
 
-      {form.viaQueries.length < 5 && (
-        <button
-          type="button"
-          onClick={addVia}
-          className="text-sm font-medium text-emerald-700 hover:text-emerald-800 active:text-emerald-900 transition-colors px-1 py-1"
-        >
-          &#xFF0B; Add stop
-        </button>
-      )}
+      {/* Add stop + Swap route buttons */}
+      <div className="flex items-center gap-3">
+        {form.viaQueries.length < 5 && (
+          <button
+            type="button"
+            onClick={addVia}
+            className="text-sm font-medium text-emerald-700 hover:text-emerald-800 active:text-emerald-900 transition-colors px-1 py-1"
+          >
+            &#xFF0B; Add stop
+          </button>
+        )}
+        {(originCoords || destCoords) && (
+          <button
+            type="button"
+            onClick={handleSwapRoute}
+            className="text-sm font-medium text-slate-600 hover:text-slate-800 active:text-slate-900 transition-colors px-1 py-1 ml-auto flex items-center gap-1"
+            title="Swap origin and destination (plan return trip)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path fillRule="evenodd" d="M2.24 6.8a.75.75 0 001.06-.04l1.95-2.1v8.59a.75.75 0 001.5 0V4.66l1.95 2.1a.75.75 0 101.1-1.02l-3.25-3.5a.75.75 0 00-1.1 0L2.2 5.74a.75.75 0 00.04 1.06zm8 6.4a.75.75 0 00-.04 1.06l3.25 3.5a.75.75 0 001.1 0l3.25-3.5a.75.75 0 10-1.1-1.02l-1.95 2.1V6.75a.75.75 0 00-1.5 0v8.59l-1.95-2.1a.75.75 0 00-1.06-.04z" clipRule="evenodd" />
+            </svg>
+            Return trip
+          </button>
+        )}
+      </div>
 
       {/* Destination */}
       <div>
@@ -207,53 +377,88 @@ export default function TripForm({ onSubmit, loading }: Props) {
         </div>
       </div>
 
-      {/* Vehicle settings — 2x2 on mobile, 4-col on md+ */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Fuel Type</label>
+      {/* Vehicle profile selector + settings */}
+      <div>
+        <div className="flex items-center gap-2 mb-2">
+          <label className="text-sm font-medium text-gray-700">Vehicle</label>
           <select
-            value={form.fuel}
-            onChange={(e) => set("fuel", e.target.value)}
-            className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base bg-white"
+            value={selectedVehicleId}
+            onChange={(e) => handleSelectVehicle(e.target.value)}
+            className="flex-1 px-2 py-1.5 min-h-[36px] border rounded-lg text-sm bg-white"
           >
-            {FUEL_TYPES.map((f) => <option key={f.code} value={f.code}>{f.name}</option>)}
+            <option value="">Custom</option>
+            {vehicles.map((v) => (
+              <option key={v.id} value={v.id}>
+                {v.name} ({v.tankSize}L, {v.consumption}L/100km)
+              </option>
+            ))}
           </select>
+          <button
+            type="button"
+            onClick={handleSaveVehicle}
+            className="px-2.5 py-1.5 min-h-[36px] text-xs font-medium text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 active:bg-emerald-100 transition-colors whitespace-nowrap"
+          >
+            Save
+          </button>
+          {selectedVehicleId && (
+            <button
+              type="button"
+              onClick={handleDeleteVehicle}
+              className="px-2.5 py-1.5 min-h-[36px] text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 active:bg-red-100 transition-colors"
+            >
+              Delete
+            </button>
+          )}
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tank (L)</label>
-          <input
-            type="number"
-            value={form.tank}
-            onChange={(e) => set("tank", Number(e.target.value))}
-            className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
-            min={10}
-            max={200}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">L/100km</label>
-          <input
-            type="number"
-            value={form.consumption}
-            onChange={(e) => set("consumption", Number(e.target.value))}
-            step={0.1}
-            className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
-            min={3}
-            max={30}
-            required
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Jerry Cans (L)</label>
-          <input
-            type="number"
-            value={form.jerry}
-            onChange={(e) => set("jerry", Number(e.target.value))}
-            className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
-            min={0}
-            max={200}
-          />
+
+        {/* Vehicle settings — 2x2 on mobile, 4-col on md+ */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Fuel Type</label>
+            <select
+              value={form.fuel}
+              onChange={(e) => setVehicleField("fuel", e.target.value)}
+              className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base bg-white"
+            >
+              {FUEL_TYPES.map((f) => <option key={f.code} value={f.code}>{f.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Tank (L)</label>
+            <input
+              type="number"
+              value={form.tank}
+              onChange={(e) => setVehicleField("tank", Number(e.target.value))}
+              className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
+              min={10}
+              max={200}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">L/100km</label>
+            <input
+              type="number"
+              value={form.consumption}
+              onChange={(e) => setVehicleField("consumption", Number(e.target.value))}
+              step={0.1}
+              className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
+              min={3}
+              max={30}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Jerry Cans (L)</label>
+            <input
+              type="number"
+              value={form.jerry}
+              onChange={(e) => setVehicleField("jerry", Number(e.target.value))}
+              className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
+              min={0}
+              max={200}
+            />
+          </div>
         </div>
       </div>
 

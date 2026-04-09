@@ -16,7 +16,7 @@ interface TripParams {
 }
 
 // Haversine distance in km
-function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
+export function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
@@ -465,7 +465,9 @@ function planNoPlanning(
 function buildStrategyResult(
   strategy: "optimised" | "cheapest_fill" | "no_planning",
   stops: TripStop[],
-  warnings: string[]
+  warnings: string[],
+  fuelAtDestination: number,
+  destinationPrice: number // cents/L, 0 if unknown
 ): StrategyResult {
   const labels = {
     optimised: "Optimised",
@@ -485,6 +487,9 @@ function buildStrategyResult(
       ? stops.reduce((sum, s) => sum + s.pricePerLitre * s.litresAdded, 0) / totalLitres
       : 0;
 
+  const clampedFuelAtDest = Math.max(0, fuelAtDestination);
+  // We don't know totalCapacity here, so destinationFillLitres/Cost are computed
+  // in the API route where capacity is known. Set placeholders (overwritten by API route).
   return {
     strategy,
     label: labels[strategy],
@@ -494,6 +499,10 @@ function buildStrategyResult(
     avgPricePerLitre: avgPrice,
     stops,
     warnings,
+    fuelAtDestination: clampedFuelAtDest,
+    destinationFillLitres: 0,
+    destinationFillCost: 0,
+    trueTripCost: totalFuelCost,
   };
 }
 
@@ -553,6 +562,16 @@ export function planTripComparison(params: TripParams): TripComparison {
     result.warnings = [...coverageWarnings, ...result.warnings];
   }
 
+  // Compute fuel remaining at destination for each strategy
+  function fuelAtDest(strategyResult: { stops: TripStop[] }): number {
+    if (strategyResult.stops.length === 0) {
+      return startingFuel - totalDistance / kmPerLitre;
+    }
+    const last = strategyResult.stops[strategyResult.stops.length - 1];
+    return last.fuelOnDeparture - (totalDistance - last.distanceFromStart) / kmPerLitre;
+  }
+
+  // destinationPrice is 0 here — the API route fills in real values after lookup
   return {
     origin: { lat: routeGeometry[0][0], lng: routeGeometry[0][1], label: "Origin" },
     destination: {
@@ -563,9 +582,9 @@ export function planTripComparison(params: TripParams): TripComparison {
     totalDistance,
     routeGeometry,
     strategies: [
-      buildStrategyResult("optimised", optimised.stops, optimised.warnings),
-      buildStrategyResult("cheapest_fill", cheapestFill.stops, cheapestFill.warnings),
-      buildStrategyResult("no_planning", noPlanning.stops, noPlanning.warnings),
+      buildStrategyResult("optimised", optimised.stops, optimised.warnings, fuelAtDest(optimised), 0),
+      buildStrategyResult("cheapest_fill", cheapestFill.stops, cheapestFill.warnings, fuelAtDest(cheapestFill), 0),
+      buildStrategyResult("no_planning", noPlanning.stops, noPlanning.warnings, fuelAtDest(noPlanning), 0),
     ],
   };
 }

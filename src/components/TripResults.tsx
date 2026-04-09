@@ -10,17 +10,20 @@ const STRATEGY_COLORS: Record<TripStrategy, { bg: string; border: string; text: 
 
 function StrategyCard({
   result,
-  bestCost,
+  bestTrueCost,
+  hasDestFuel,
   selected,
   onSelect,
 }: {
   result: StrategyResult;
-  bestCost: number;
+  bestTrueCost: number;
+  hasDestFuel: boolean;
   selected: boolean;
   onSelect: () => void;
 }) {
   const colors = STRATEGY_COLORS[result.strategy];
-  const extra = result.totalFuelCost - bestCost;
+  const compareCost = hasDestFuel ? result.trueTripCost : result.totalFuelCost;
+  const extra = compareCost - bestTrueCost;
 
   return (
     <button
@@ -39,7 +42,19 @@ function StrategyCard({
               {result.label}
             </span>
           </div>
-          <div className="text-xl md:text-2xl font-bold text-gray-900">${result.totalFuelCost.toFixed(2)}</div>
+
+          {hasDestFuel ? (
+            <>
+              <div className="text-xl md:text-2xl font-bold text-gray-900">
+                ${result.trueTripCost.toFixed(2)}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5">
+                Trip ${result.totalFuelCost.toFixed(2)} + dest fill ${result.destinationFillCost.toFixed(2)}
+              </div>
+            </>
+          ) : (
+            <div className="text-xl md:text-2xl font-bold text-gray-900">${result.totalFuelCost.toFixed(2)}</div>
+          )}
           <div className="text-xs text-gray-500 mt-0.5 md:mt-1 hidden md:block">{result.description}</div>
         </div>
 
@@ -54,8 +69,8 @@ function StrategyCard({
             <span className="text-gray-500 ml-0.5 md:ml-0 md:block hidden md:inline"> fuel</span>
           </div>
           <div>
-            <span className="font-medium text-gray-900">{result.avgPricePerLitre.toFixed(1)}c</span>
-            <span className="text-gray-500 ml-0.5 md:ml-0 md:block hidden md:inline"> avg/L</span>
+            <span className="font-medium text-gray-900">{result.fuelAtDestination.toFixed(0)}L</span>
+            <span className="text-gray-500 ml-0.5 md:ml-0 md:block hidden md:inline"> on arrival</span>
           </div>
         </div>
 
@@ -147,10 +162,17 @@ export default function TripResults({
 }) {
   const setSelectedStrategy = onStrategyChange;
 
-  const bestCost = Math.min(...comparison.strategies.map((s) => s.totalFuelCost));
+  const hasDestFuel = !!comparison.destinationFuel;
+  const bestTrueCost = Math.min(
+    ...comparison.strategies.map((s) => (hasDestFuel ? s.trueTripCost : s.totalFuelCost))
+  );
   const selected = comparison.strategies.find((s) => s.strategy === selectedStrategy)!;
   const optimised = comparison.strategies.find((s) => s.strategy === "optimised")!;
   const noPlanning = comparison.strategies.find((s) => s.strategy === "no_planning")!;
+
+  const savingsValue = hasDestFuel
+    ? noPlanning.trueTripCost - optimised.trueTripCost
+    : noPlanning.totalFuelCost - optimised.totalFuelCost;
 
   return (
     <div className="space-y-4 md:space-y-6">
@@ -160,12 +182,32 @@ export default function TripResults({
           {comparison.totalDistance.toFixed(0)} km
         </div>
         <div className="text-gray-500 text-sm">total distance</div>
-        {noPlanning.totalFuelCost - optimised.totalFuelCost > 1 && (
+        {savingsValue > 1 && (
           <div className="mt-2 inline-block bg-emerald-100 text-emerald-800 font-bold px-3 md:px-4 py-1 rounded-full text-sm">
-            Save ${(noPlanning.totalFuelCost - optimised.totalFuelCost).toFixed(2)} with smart planning
+            Save ${savingsValue.toFixed(2)} with smart planning
           </div>
         )}
       </div>
+
+      {/* Destination fuel callout */}
+      {comparison.destinationFuel && (
+        <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 text-sm">
+          <div className="flex items-center gap-2 text-slate-700">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4 text-slate-400 shrink-0">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a.75.75 0 000 1.5h.253a.25.25 0 01.244.304l-.459 2.066A1.75 1.75 0 0010.747 15H11a.75.75 0 000-1.5h-.253a.25.25 0 01-.244-.304l.459-2.066A1.75 1.75 0 009.253 9H9z" clipRule="evenodd" />
+            </svg>
+            <span>
+              Cheapest {comparison.destinationFuel.fuel} near destination:{" "}
+              <strong>{comparison.destinationFuel.price.toFixed(1)} c/L</strong> at{" "}
+              {comparison.destinationFuel.stationName}
+              <span className="text-slate-500"> ({comparison.destinationFuel.distance.toFixed(0)} km away)</span>
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-1 ml-6">
+            True trip cost includes filling to full at this price on arrival
+          </p>
+        </div>
+      )}
 
       {/* Strategy comparison cards — stacked on mobile, 3-col grid on md+ */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-3">
@@ -173,7 +215,8 @@ export default function TripResults({
           <StrategyCard
             key={result.strategy}
             result={result}
-            bestCost={bestCost}
+            bestTrueCost={bestTrueCost}
+            hasDestFuel={hasDestFuel}
             selected={selectedStrategy === result.strategy}
             onSelect={() => setSelectedStrategy(result.strategy)}
           />

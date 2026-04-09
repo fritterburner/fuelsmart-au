@@ -115,6 +115,16 @@ export default function Home() {
           >
             FuelWatch WA
           </a>
+          ,{" "}
+          <a
+            href="https://www.fuelcheck.nsw.gov.au"
+            className="underline"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            FuelCheck NSW
+          </a>
+          , FuelCheck TAS
         </span>
         <span>Prices updated daily</span>
       </footer>

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCachedStations } from "@/lib/cache";
-import { planTripComparison } from "@/lib/trip-planner";
-import { FuelCode } from "@/lib/types";
+import { planTripComparison, haversine } from "@/lib/trip-planner";
+import { FuelCode, DestinationFuelInfo } from "@/lib/types";
+import { FUEL_FALLBACKS } from "@/lib/fuel-codes";
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -71,6 +72,48 @@ export async function GET(request: NextRequest) {
     arriveFull,
     reservePct,
   });
+
+  // Find cheapest fuel near destination (within 25km)
+  const totalCapacity = tank + jerry;
+  const fallbacks = allowFallback ? (FUEL_FALLBACKS[fuel] || []) : [];
+  let destinationFuel: DestinationFuelInfo | undefined;
+
+  const nearDest = stations
+    .map((s) => {
+      const dist = haversine(dLat, dLng, s.lat, s.lng);
+      if (dist > 25) return null;
+      let priceEntry = s.prices.find((p) => p.fuel === fuel);
+      let usedFuel = fuel;
+      if (!priceEntry) {
+        for (const fb of fallbacks) {
+          priceEntry = s.prices.find((p) => p.fuel === fb);
+          if (priceEntry) { usedFuel = fb; break; }
+        }
+      }
+      if (!priceEntry) return null;
+      return { station: s, price: priceEntry.price, fuel: usedFuel as FuelCode, distance: dist };
+    })
+    .filter(Boolean) as { station: typeof stations[0]; price: number; fuel: FuelCode; distance: number }[];
+
+  if (nearDest.length > 0) {
+    const cheapest = nearDest.reduce((best, s) => (s.price < best.price ? s : best));
+    destinationFuel = {
+      stationName: cheapest.station.name,
+      brand: cheapest.station.brand,
+      price: cheapest.price,
+      fuel: cheapest.fuel,
+      distance: cheapest.distance,
+    };
+
+    // Fill in destination fill costs for each strategy
+    for (const strat of comparison.strategies) {
+      strat.destinationFillLitres = Math.max(0, totalCapacity - strat.fuelAtDestination);
+      strat.destinationFillCost = (strat.destinationFillLitres * cheapest.price) / 100;
+      strat.trueTripCost = strat.totalFuelCost + strat.destinationFillCost;
+    }
+  }
+
+  comparison.destinationFuel = destinationFuel;
 
   return NextResponse.json(comparison);
 }

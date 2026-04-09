@@ -11,7 +11,7 @@ export interface Station {
   brandCode: string;
   address: string;
   suburb: string;
-  state: "NT" | "QLD" | "WA" | "NSW";
+  state: "NT" | "QLD" | "WA" | "NSW" | "ACT" | "SA" | "VIC" | "TAS";
   postcode: string;
   lat: number;
   lng: number;
@@ -68,6 +68,18 @@ export interface StrategyResult {
   avgPricePerLitre: number; // cents
   stops: TripStop[];
   warnings: string[];
+  fuelAtDestination: number; // litres remaining on arrival
+  destinationFillLitres: number; // litres needed to fill to full
+  destinationFillCost: number; // dollars at destination's cheapest price
+  trueTripCost: number; // totalFuelCost + destinationFillCost
+}
+
+export interface DestinationFuelInfo {
+  stationName: string;
+  brand: string;
+  price: number; // cents per litre
+  fuel: FuelCode;
+  distance: number; // km from destination
 }
 
 export interface TripComparison {
@@ -76,4 +88,14 @@ export interface TripComparison {
   totalDistance: number; // km
   routeGeometry: [number, number][];
   strategies: StrategyResult[];
+  destinationFuel?: DestinationFuelInfo;
+}
+
+export interface VehicleProfile {
+  id: string;
+  name: string;
+  fuel: FuelCode;
+  tankSize: number;
+  consumption: number;
+  jerryCapacity: number;
 }

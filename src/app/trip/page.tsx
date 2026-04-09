@@ -100,7 +100,7 @@ export default function TripPage() {
       </div>
 
       <div className="bg-slate-900 text-gray-400 text-xs px-3 py-1 mt-8">
-        Data: NT Gov, QLD Gov, <a href="https://www.fuelwatch.wa.gov.au" className="underline">FuelWatch WA</a>
+        Data: NT Gov, QLD Gov, <a href="https://www.fuelwatch.wa.gov.au" className="underline">FuelWatch WA</a>, <a href="https://www.fuelcheck.nsw.gov.au" className="underline">FuelCheck NSW</a>, FuelCheck TAS
       </div>
     </div>
   );

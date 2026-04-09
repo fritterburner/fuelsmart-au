@@ -3,6 +3,7 @@ import { fetchNTStations } from "./fetchers/nt";
 import { fetchQLDStations } from "./fetchers/qld";
 import { fetchWAStations } from "./fetchers/wa";
 import { fetchNSWStations } from "./fetchers/nsw";
+import { fetchTASStations } from "./fetchers/tas";
 import { cacheStations, setStateLastUpdate } from "./cache";
 
 export async function refreshAllData(): Promise<{
@@ -10,6 +11,7 @@ export async function refreshAllData(): Promise<{
   qld: number;
   wa: number;
   nsw: number;
+  tas: number;
   total: number;
   errors: string[];
 }> {
@@ -17,14 +19,15 @@ export async function refreshAllData(): Promise<{
   const allStations: Station[] = [];
 
   // Fetch all sources in parallel
-  const [ntResult, qldResult, waResult, nswResult] = await Promise.allSettled([
+  const [ntResult, qldResult, waResult, nswResult, tasResult] = await Promise.allSettled([
     fetchNTStations(),
     fetchQLDStations(),
     fetchWAStations(),
     fetchNSWStations(),
+    fetchTASStations(),
   ]);
 
-  let ntCount = 0, qldCount = 0, waCount = 0, nswCount = 0;
+  let ntCount = 0, qldCount = 0, waCount = 0, nswCount = 0, tasCount = 0;
 
   if (ntResult.status === "fulfilled") {
     allStations.push(...ntResult.value);
@@ -58,6 +61,14 @@ export async function refreshAllData(): Promise<{
     errors.push(`NSW: ${nswResult.reason}`);
   }
 
+  if (tasResult.status === "fulfilled") {
+    allStations.push(...tasResult.value);
+    tasCount = tasResult.value.length;
+    if (tasCount > 0) await setStateLastUpdate("TAS");
+  } else {
+    errors.push(`TAS: ${tasResult.reason}`);
+  }
+
   // Cache whatever we got (partial success is better than nothing)
   if (allStations.length > 0) {
     await cacheStations(allStations);
@@ -68,6 +79,7 @@ export async function refreshAllData(): Promise<{
     qld: qldCount,
     wa: waCount,
     nsw: nswCount,
+    tas: tasCount,
     total: allStations.length,
     errors,
   };
