@@ -16,6 +16,7 @@ interface TripFormData {
   startingFuelPct: number;
   allowFallback: boolean;
   arriveFull: boolean;
+  reservePct: number;
 }
 
 interface Props {
@@ -39,6 +40,7 @@ export default function TripForm({ onSubmit, loading }: Props) {
     startingFuelPct: 100,
     allowFallback: true,
     arriveFull: false,
+    reservePct: 10,
   });
 
   // Store confirmed coordinates for each location
@@ -290,6 +292,30 @@ export default function TripForm({ onSubmit, loading }: Props) {
           Arrive with full tank (stock up at cheapest stops)
         </span>
       </label>
+
+      {/* Fuel reserve threshold slider */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Minimum Fuel Reserve
+        </label>
+        <div className="flex items-center gap-3">
+          <input
+            type="range"
+            min={0}
+            max={30}
+            step={5}
+            value={form.reservePct}
+            onChange={(e) => set("reservePct", Number(e.target.value))}
+            className="flex-1 min-h-[44px] accent-emerald-600"
+          />
+          <span className="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[110px] text-right">
+            {form.reservePct}% ({Math.round(form.reservePct / 100 * form.tank)}L of {form.tank}L)
+          </span>
+        </div>
+        <p className="text-xs text-gray-500 mt-0.5">
+          Never arrive at a stop with less than this in the tank
+        </p>
+      </div>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
 

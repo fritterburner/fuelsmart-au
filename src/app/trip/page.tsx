@@ -25,6 +25,7 @@ export default function TripPage() {
     startingFuelPct: number;
     allowFallback: boolean;
     arriveFull: boolean;
+    reservePct: number;
   }) {
     setLoading(true);
     setError("");
@@ -41,6 +42,7 @@ export default function TripPage() {
       startFuel: String(data.startingFuelPct),
       ...(!data.allowFallback ? { fallback: "0" } : {}),
       ...(data.arriveFull ? { arriveFull: "1" } : {}),
+      ...(data.reservePct !== 10 ? { reservePct: String(data.reservePct) } : {}),
     });
 
     if (data.viaCoords.length > 0) {

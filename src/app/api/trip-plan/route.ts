@@ -15,6 +15,7 @@ export async function GET(request: NextRequest) {
   const startFuel = Number(params.get("startFuel") || 100);
   const allowFallback = params.get("fallback") !== "0"; // on by default
   const arriveFull = params.get("arriveFull") === "1"; // off by default
+  const reservePct = Math.min(30, Math.max(0, Number(params.get("reservePct") || 10)));
 
   if (!origin || !dest) {
     return NextResponse.json({ error: "origin and dest required" }, { status: 400 });
@@ -68,6 +69,7 @@ export async function GET(request: NextRequest) {
     startingFuelPct: startFuel,
     allowFallback,
     arriveFull,
+    reservePct,
   });
 
   return NextResponse.json(comparison);

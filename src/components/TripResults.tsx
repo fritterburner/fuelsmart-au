@@ -118,7 +118,7 @@ function StopList({ result }: { result: StrategyResult }) {
 
           {/* Fuel gauge bar — taller on mobile for readability */}
           <div className="flex items-center gap-2 text-xs text-gray-600">
-            <span className="shrink-0">{stop.fuelOnArrival.toFixed(0)}L</span>
+            <span className="shrink-0">Arrive {stop.fuelOnArrival.toFixed(0)}L</span>
             <div className="flex-1 h-3 md:h-2 bg-gray-200 rounded-full overflow-hidden">
               <div
                 className="h-full rounded-full transition-all"
@@ -128,7 +128,7 @@ function StopList({ result }: { result: StrategyResult }) {
                 }}
               />
             </div>
-            <span className="shrink-0">{stop.fuelOnDeparture.toFixed(0)}L</span>
+            <span className="shrink-0">Depart {stop.fuelOnDeparture.toFixed(0)}L</span>
           </div>
         </div>
       ))}

@@ -12,6 +12,7 @@ interface TripParams {
   startingFuelPct?: number; // 0-100, defaults to 100
   allowFallback?: boolean; // use LAF/OPAL when primary fuel unavailable
   arriveFull?: boolean; // fill to brim at cheapest stops (arrive with max fuel)
+  reservePct?: number; // 0-30, hard minimum fuel % at any stop (default 10)
 }
 
 // Haversine distance in km
@@ -217,10 +218,10 @@ function planOptimised(
   kmPerLitre: number,
   totalDistance: number,
   startingFuel: number,
-  arriveFull: boolean = false
+  arriveFull: boolean = false,
+  reserveLevel: number = totalCapacity * 0.10
 ): { stops: TripStop[]; warnings: string[] } {
-  const safetyLitres = Math.max(totalCapacity * 0.20, 30 / kmPerLitre);
-  const minFill = Math.max(15, totalCapacity * 0.20);
+  const minFill = Math.max(10, totalCapacity * 0.15);
   const minStopGap = 50;
 
   const warnings: string[] = [];
@@ -231,10 +232,10 @@ function planOptimised(
 
   while (currentKm < totalDistance) {
     const fuelNeededToFinish = (totalDistance - currentKm) / kmPerLitre;
-    if (currentFuel >= fuelNeededToFinish + safetyLitres) break;
+    if (currentFuel >= fuelNeededToFinish + reserveLevel) break;
 
-    const usableFuel = currentFuel - safetyLitres;
-    const maxRangeKm = usableFuel * kmPerLitre;
+    const usableFuel = currentFuel - reserveLevel;
+    const maxRangeKm = Math.max(0, usableFuel * kmPerLitre);
 
     const reachable = deduped.filter(
       (s) =>
@@ -249,6 +250,7 @@ function planOptimised(
         : deduped.filter((s) => s.along > currentKm + 5 && s.along <= currentKm + maxRangeKm);
 
     if (candidates.length === 0) {
+      // No station within reserve-safe range — find closest to minimize shortfall
       const desperate = deduped.filter(
         (s) => s.along > currentKm + 1 && s.along <= currentKm + currentFuel * kmPerLitre
       );
@@ -263,6 +265,12 @@ function planOptimised(
       const emergencyStop = desperate.reduce((best, s) => (s.price < best.price ? s : best));
       const fuelUsed = (emergencyStop.along - currentKm) / kmPerLitre;
       const fuelOnArrival = currentFuel - fuelUsed;
+      if (fuelOnArrival < reserveLevel) {
+        warnings.push(
+          `Warning: Arrive at ${emergencyStop.station.name} with only ${Math.round(fuelOnArrival)}L ` +
+            `(below ${Math.round(reserveLevel)}L reserve). Consider starting with more fuel.`
+        );
+      }
       const litresAdded = totalCapacity - fuelOnArrival;
       stops.push(makeStop(emergencyStop, currentKm, currentFuel, kmPerLitre, litresAdded));
       currentFuel = totalCapacity;
@@ -285,7 +293,7 @@ function planOptimised(
     let litresAdded: number;
     if (cheaperAhead) {
       const fuelNeededToReachCheap =
-        (cheaperAhead.along - cheapest.along) / kmPerLitre + safetyLitres;
+        (cheaperAhead.along - cheapest.along) / kmPerLitre + reserveLevel;
       litresAdded = Math.max(0, fuelNeededToReachCheap - fuelOnArrival);
     } else {
       litresAdded = totalCapacity - fuelOnArrival;
@@ -294,18 +302,22 @@ function planOptimised(
     litresAdded = Math.min(litresAdded, totalCapacity - fuelOnArrival);
 
     if (litresAdded < minFill) {
-      // Check if we can reach further stations with the fuel we'd have at this point
-      const canReachFurther = deduped.some(
+      // Only skip if we'd arrive at the next station ABOVE reserve
+      const nextStation = deduped.find(
         (s) =>
           s.along > cheapest.along + minStopGap &&
           s.along <= cheapest.along + fuelOnArrival * kmPerLitre
       );
-      if (canReachFurther) {
-        // Skip this station — but track fuel burned driving here
+      const fuelAtNext = nextStation
+        ? fuelOnArrival - (nextStation.along - cheapest.along) / kmPerLitre
+        : 0;
+      if (nextStation && fuelAtNext >= reserveLevel) {
+        // Safe to skip — we'll arrive at next station above reserve
         currentFuel = fuelOnArrival;
         currentKm = cheapest.along + 1;
         continue;
       }
+      // Not safe to skip — fill here
       litresAdded = Math.max(litresAdded, Math.min(minFill, totalCapacity - fuelOnArrival));
     }
 
@@ -313,7 +325,7 @@ function planOptimised(
 
     // Don't buy more fuel than needed to finish the trip (unless arriveFull)
     if (!arriveFull) {
-      const fuelToFinish = (totalDistance - cheapest.along) / kmPerLitre + safetyLitres;
+      const fuelToFinish = (totalDistance - cheapest.along) / kmPerLitre + reserveLevel;
       litresAdded = Math.min(litresAdded, Math.max(0, fuelToFinish - fuelOnArrival));
     }
 
@@ -340,9 +352,9 @@ function planCheapestFill(
   totalCapacity: number,
   kmPerLitre: number,
   totalDistance: number,
-  startingFuel: number
+  startingFuel: number,
+  reserveLevel: number = totalCapacity * 0.10
 ): { stops: TripStop[]; warnings: string[] } {
-  const safetyLitres = Math.max(totalCapacity * 0.20, 30 / kmPerLitre);
   const minStopGap = 50;
 
   const warnings: string[] = [];
@@ -353,13 +365,11 @@ function planCheapestFill(
 
   while (currentKm < totalDistance) {
     const fuelNeededToFinish = (totalDistance - currentKm) / kmPerLitre;
-    if (currentFuel >= fuelNeededToFinish + safetyLitres) break;
+    if (currentFuel >= fuelNeededToFinish + reserveLevel) break;
 
-    // When do we NEED to stop? When fuel drops to safety margin
-    const usableFuel = currentFuel - safetyLitres;
-    const maxRangeKm = usableFuel * kmPerLitre;
+    const usableFuel = currentFuel - reserveLevel;
+    const maxRangeKm = Math.max(0, usableFuel * kmPerLitre);
 
-    // Find all reachable stations
     const reachable = deduped.filter(
       (s) =>
         s.along > currentKm + 5 &&
@@ -379,7 +389,6 @@ function planCheapestFill(
       break;
     }
 
-    // Pick the single cheapest reachable station, always fill to brim
     const cheapest = candidates.reduce((best, s) => (s.price < best.price ? s : best));
     const fuelUsedToStop = (cheapest.along - currentKm) / kmPerLitre;
     const fuelOnArrival = currentFuel - fuelUsedToStop;
@@ -401,11 +410,10 @@ function planNoPlanning(
   totalCapacity: number,
   kmPerLitre: number,
   totalDistance: number,
-  startingFuel: number
+  startingFuel: number,
+  reserveLevel: number = totalCapacity * 0.10
 ): { stops: TripStop[]; warnings: string[] } {
-  // Fuel light comes on at ~1/8 tank (12.5%). Driver pulls into the next servo.
-  const fuelLightThreshold = totalCapacity * 0.125;
-  const safetyLitres = totalCapacity * 0.05; // absolute minimum before stranded
+  const fuelLightThreshold = Math.max(totalCapacity * 0.125, reserveLevel);
 
   const warnings: string[] = [];
   const stops: TripStop[] = [];
@@ -414,7 +422,7 @@ function planNoPlanning(
 
   while (currentKm < totalDistance) {
     const fuelNeededToFinish = (totalDistance - currentKm) / kmPerLitre;
-    if (currentFuel >= fuelNeededToFinish + safetyLitres) break;
+    if (currentFuel >= fuelNeededToFinish + reserveLevel) break;
 
     // Drive until fuel light comes on
     const kmUntilLight = (currentFuel - fuelLightThreshold) * kmPerLitre;
@@ -428,7 +436,7 @@ function planNoPlanning(
     // If nothing after the light point, look for the last station before running dry
     if (!nextStation) {
       const beforeDry = deduped.filter(
-        (s) => s.along > currentKm + 1 && s.along <= currentKm + (currentFuel - safetyLitres) * kmPerLitre
+        (s) => s.along > currentKm + 1 && s.along <= currentKm + (currentFuel - reserveLevel) * kmPerLitre
       );
       nextStation = beforeDry.length > 0 ? beforeDry[beforeDry.length - 1] : undefined;
     }
@@ -534,9 +542,11 @@ export function planTripComparison(params: TripParams): TripComparison {
     );
   }
 
-  const optimised = planOptimised(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel, params.arriveFull);
-  const cheapestFill = planCheapestFill(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel);
-  const noPlanning = planNoPlanning(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel);
+  const reserveLevel = totalCapacity * ((params.reservePct ?? 10) / 100);
+
+  const optimised = planOptimised(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel, params.arriveFull, reserveLevel);
+  const cheapestFill = planCheapestFill(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel, reserveLevel);
+  const noPlanning = planNoPlanning(deduped, totalCapacity, kmPerLitre, totalDistance, startingFuel, reserveLevel);
 
   // Prepend coverage warnings to all strategies
   for (const result of [optimised, cheapestFill, noPlanning]) {
