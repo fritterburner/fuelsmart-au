@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
   const allowFallback = params.get("fallback") !== "0"; // on by default
   const arriveFull = params.get("arriveFull") === "1"; // off by default
   const reservePct = Math.min(30, Math.max(0, Number(params.get("reservePct") || 10)));
+  const returnTrip = params.get("returnTrip") === "1";
 
   if (!origin || !dest) {
     return NextResponse.json({ error: "origin and dest required" }, { status: 400 });
@@ -38,6 +39,16 @@ export async function GET(request: NextRequest) {
   }
 
   waypoints.push(`${dLng},${dLat}`);
+
+  // Return trip: A → V1 → V2 → B becomes A → V1 → V2 → B → V2 → V1 → A
+  if (returnTrip) {
+    // Reverse the via points and add origin as final destination
+    const viaWaypoints = waypoints.slice(1, -1); // just the via points
+    for (let i = viaWaypoints.length - 1; i >= 0; i--) {
+      waypoints.push(viaWaypoints[i]);
+    }
+    waypoints.push(`${oLng},${oLat}`); // end back at origin
+  }
 
   const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${waypoints.join(";")}?overview=full&geometries=geojson`;
   const routeResp = await fetch(osrmUrl);
@@ -73,14 +84,17 @@ export async function GET(request: NextRequest) {
     reservePct,
   });
 
-  // Find cheapest fuel near destination (within 25km)
+  // Find cheapest fuel near final destination (within 25km)
+  // For return trips, the final destination is the origin
   const totalCapacity = tank + jerry;
   const fallbacks = allowFallback ? (FUEL_FALLBACKS[fuel] || []) : [];
   let destinationFuel: DestinationFuelInfo | undefined;
+  const finalLat = returnTrip ? oLat : dLat;
+  const finalLng = returnTrip ? oLng : dLng;
 
   const nearDest = stations
     .map((s) => {
-      const dist = haversine(dLat, dLng, s.lat, s.lng);
+      const dist = haversine(finalLat, finalLng, s.lat, s.lng);
       if (dist > 25) return null;
       let priceEntry = s.prices.find((p) => p.fuel === fuel);
       let usedFuel = fuel;

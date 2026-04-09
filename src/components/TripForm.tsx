@@ -18,6 +18,7 @@ interface TripFormData {
   allowFallback: boolean;
   arriveFull: boolean;
   reservePct: number;
+  returnTrip: boolean;
 }
 
 interface Props {
@@ -42,6 +43,7 @@ export default function TripForm({ onSubmit, loading }: Props) {
     allowFallback: true,
     arriveFull: false,
     reservePct: 10,
+    returnTrip: false,
   });
 
   // Store confirmed coordinates for each location
@@ -176,37 +178,6 @@ export default function TripForm({ onSubmit, loading }: Props) {
     setOriginCoords(destCoords);
     setDestCoords(tmpCoords);
     setViaCoords((v) => [...v].reverse());
-  }
-
-  // ─── Return Trip (A-B → A-B-A) ───────────────────────────────────────────
-  const [returnTrip, setReturnTrip] = useState(false);
-
-  function handleReturnTripToggle(checked: boolean) {
-    setReturnTrip(checked);
-    if (checked && originCoords && destCoords) {
-      // Add current via points reversed + original destination as via, origin becomes new dest
-      // A → V1 → V2 → B becomes A → V1 → V2 → B → V2 → V1 → A
-      const returnVias = [
-        form.destQuery,
-        ...[...form.viaQueries].reverse(),
-      ];
-      const returnViaCoords = [
-        destCoords,
-        ...[...viaCoords].reverse(),
-      ];
-      setForm((f) => ({
-        ...f,
-        destQuery: f.originQuery,
-        viaQueries: [...f.viaQueries, ...returnVias],
-      }));
-      setViaCoords((v) => [...v, ...returnViaCoords]);
-      setDestCoords(originCoords);
-    } else if (!checked) {
-      // Remove the return leg — keep only the first half of via points
-      // This is a best-effort trim: if user manually edited, we just untoggle
-      // Find the midpoint: original had N vias, return added N+1 more
-      // We can't perfectly reverse arbitrary edits, so just untoggle the flag
-    }
   }
 
   // ─── Submit ───────────────────────────────────────────────────────────────
@@ -366,19 +337,6 @@ export default function TripForm({ onSubmit, loading }: Props) {
             Reverse direction
           </button>
         )}
-        {originCoords && destCoords && !returnTrip && (
-          <button
-            type="button"
-            onClick={() => handleReturnTripToggle(true)}
-            className="text-sm font-medium text-slate-600 hover:text-slate-800 active:text-slate-900 transition-colors px-1 py-1 ml-auto flex items-center gap-1"
-            title="Plan a return trip (A → B → A)"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
-              <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.598a.75.75 0 00-.75.75v3.634a.75.75 0 001.5 0v-2.033a7 7 0 0011.787-3.127.75.75 0 00-1.823-.379zM4.688 8.576a5.5 5.5 0 019.201-2.466l.312.311H11.77a.75.75 0 000 1.5h3.634a.75.75 0 00.75-.75V3.537a.75.75 0 00-1.5 0v2.033A7 7 0 002.866 8.697a.75.75 0 001.822.379z" clipRule="evenodd" />
-            </svg>
-            Return trip
-          </button>
-        )}
       </div>
 
       {/* Destination */}
@@ -399,6 +357,27 @@ export default function TripForm({ onSubmit, loading }: Props) {
           confirmed={!!destCoords}
         />
       </div>
+
+      {/* Return trip toggle */}
+      <label className="flex items-center gap-3 cursor-pointer">
+        <div className="relative">
+          <input
+            type="checkbox"
+            checked={form.returnTrip}
+            onChange={(e) => set("returnTrip", e.target.checked)}
+            className="sr-only peer"
+          />
+          <div className="w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-emerald-500 transition-colors" />
+          <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform" />
+        </div>
+        <span className="text-sm text-gray-700">
+          Return trip{form.returnTrip && originCoords && destCoords ? (
+            <span className="text-gray-400 ml-1">
+              (route back {form.viaQueries.length > 0 ? "via same stops" : "included"})
+            </span>
+          ) : null}
+        </span>
+      </label>
 
       {/* Starting Fuel Level slider */}
       <div>
