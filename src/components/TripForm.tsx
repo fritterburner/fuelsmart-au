@@ -164,8 +164,8 @@ export default function TripForm({ onSubmit, loading }: Props) {
     setGmapsLoading(false);
   }
 
-  // ─── Return Trip ──────────────────────────────────────────────────────────
-  function handleSwapRoute() {
+  // ─── Reverse Direction ─────────────────────────────────────────────────────
+  function handleReverseRoute() {
     setForm((f) => ({
       ...f,
       originQuery: f.destQuery,
@@ -176,6 +176,37 @@ export default function TripForm({ onSubmit, loading }: Props) {
     setOriginCoords(destCoords);
     setDestCoords(tmpCoords);
     setViaCoords((v) => [...v].reverse());
+  }
+
+  // ─── Return Trip (A-B → A-B-A) ───────────────────────────────────────────
+  const [returnTrip, setReturnTrip] = useState(false);
+
+  function handleReturnTripToggle(checked: boolean) {
+    setReturnTrip(checked);
+    if (checked && originCoords && destCoords) {
+      // Add current via points reversed + original destination as via, origin becomes new dest
+      // A → V1 → V2 → B becomes A → V1 → V2 → B → V2 → V1 → A
+      const returnVias = [
+        form.destQuery,
+        ...[...form.viaQueries].reverse(),
+      ];
+      const returnViaCoords = [
+        destCoords,
+        ...[...viaCoords].reverse(),
+      ];
+      setForm((f) => ({
+        ...f,
+        destQuery: f.originQuery,
+        viaQueries: [...f.viaQueries, ...returnVias],
+      }));
+      setViaCoords((v) => [...v, ...returnViaCoords]);
+      setDestCoords(originCoords);
+    } else if (!checked) {
+      // Remove the return leg — keep only the first half of via points
+      // This is a best-effort trim: if user manually edited, we just untoggle
+      // Find the midpoint: original had N vias, return added N+1 more
+      // We can't perfectly reverse arbitrary edits, so just untoggle the flag
+    }
   }
 
   // ─── Submit ───────────────────────────────────────────────────────────────
@@ -208,7 +239,7 @@ export default function TripForm({ onSubmit, loading }: Props) {
     setForm((f) => ({ ...f, [field]: value }));
 
   const addVia = () => {
-    if (form.viaQueries.length >= 5) return;
+    if (form.viaQueries.length >= 10) return;
     setForm((f) => ({ ...f, viaQueries: [...f.viaQueries, ""] }));
     setViaCoords((v) => [...v, null]);
   };
@@ -311,9 +342,9 @@ export default function TripForm({ onSubmit, loading }: Props) {
         </div>
       ))}
 
-      {/* Add stop + Swap route buttons */}
-      <div className="flex items-center gap-3">
-        {form.viaQueries.length < 5 && (
+      {/* Route action buttons */}
+      <div className="flex items-center gap-3 flex-wrap">
+        {form.viaQueries.length < 10 && (
           <button
             type="button"
             onClick={addVia}
@@ -325,12 +356,25 @@ export default function TripForm({ onSubmit, loading }: Props) {
         {(originCoords || destCoords) && (
           <button
             type="button"
-            onClick={handleSwapRoute}
-            className="text-sm font-medium text-slate-600 hover:text-slate-800 active:text-slate-900 transition-colors px-1 py-1 ml-auto flex items-center gap-1"
-            title="Swap origin and destination (plan return trip)"
+            onClick={handleReverseRoute}
+            className="text-sm font-medium text-slate-600 hover:text-slate-800 active:text-slate-900 transition-colors px-1 py-1 flex items-center gap-1"
+            title="Reverse the route direction"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
               <path fillRule="evenodd" d="M2.24 6.8a.75.75 0 001.06-.04l1.95-2.1v8.59a.75.75 0 001.5 0V4.66l1.95 2.1a.75.75 0 101.1-1.02l-3.25-3.5a.75.75 0 00-1.1 0L2.2 5.74a.75.75 0 00.04 1.06zm8 6.4a.75.75 0 00-.04 1.06l3.25 3.5a.75.75 0 001.1 0l3.25-3.5a.75.75 0 10-1.1-1.02l-1.95 2.1V6.75a.75.75 0 00-1.5 0v8.59l-1.95-2.1a.75.75 0 00-1.06-.04z" clipRule="evenodd" />
+            </svg>
+            Reverse direction
+          </button>
+        )}
+        {originCoords && destCoords && !returnTrip && (
+          <button
+            type="button"
+            onClick={() => handleReturnTripToggle(true)}
+            className="text-sm font-medium text-slate-600 hover:text-slate-800 active:text-slate-900 transition-colors px-1 py-1 ml-auto flex items-center gap-1"
+            title="Plan a return trip (A → B → A)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-4 h-4">
+              <path fillRule="evenodd" d="M15.312 11.424a5.5 5.5 0 01-9.201 2.466l-.312-.311h2.433a.75.75 0 000-1.5H4.598a.75.75 0 00-.75.75v3.634a.75.75 0 001.5 0v-2.033a7 7 0 0011.787-3.127.75.75 0 00-1.823-.379zM4.688 8.576a5.5 5.5 0 019.201-2.466l.312.311H11.77a.75.75 0 000 1.5h3.634a.75.75 0 00.75-.75V3.537a.75.75 0 00-1.5 0v2.033A7 7 0 002.866 8.697a.75.75 0 001.822.379z" clipRule="evenodd" />
             </svg>
             Return trip
           </button>
