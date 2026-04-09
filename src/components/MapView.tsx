@@ -36,6 +36,27 @@ function getBoundsString(map: L.Map): string {
   return `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
 }
 
+const MAP_POS_KEY = "fuelsmart-mappos";
+
+function saveMapPosition(map: L.Map) {
+  const c = map.getCenter();
+  const z = map.getZoom();
+  localStorage.setItem(MAP_POS_KEY, JSON.stringify({ lat: c.lat, lng: c.lng, zoom: z }));
+}
+
+function loadMapPosition(): { lat: number; lng: number; zoom: number } | null {
+  if (typeof window === "undefined") return null;
+  const stored = localStorage.getItem(MAP_POS_KEY);
+  if (!stored) return null;
+  try {
+    const pos = JSON.parse(stored);
+    if (typeof pos.lat === "number" && typeof pos.lng === "number" && typeof pos.zoom === "number") {
+      return pos;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
 function MapController({
   onBoundsChange,
   fuel,
@@ -45,13 +66,48 @@ function MapController({
 }) {
   const map = useMap();
   const lastFuel = useRef(fuel);
+  const geolocated = useRef(false);
 
-  // Fetch on map move
+  // Fetch on map move + persist position
   useMapEvents({
-    moveend: () => onBoundsChange(getBoundsString(map)),
+    moveend: () => {
+      saveMapPosition(map);
+      onBoundsChange(getBoundsString(map));
+    },
   });
 
-  // Fetch on initial mount
+  // On mount: try geolocation if no saved position
+  useEffect(() => {
+    if (geolocated.current) return;
+    geolocated.current = true;
+
+    const saved = loadMapPosition();
+    if (saved) {
+      // Already positioned from saved state (MapContainer initial center)
+      // Just trigger station fetch
+      const timer = setTimeout(() => onBoundsChange(getBoundsString(map)), 200);
+      return () => clearTimeout(timer);
+    }
+
+    // No saved position — try browser geolocation
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          map.setView([pos.coords.latitude, pos.coords.longitude], 12);
+          // moveend handler will save + fetch
+        },
+        () => {
+          // Denied or unavailable — stay at fallback, just fetch
+          onBoundsChange(getBoundsString(map));
+        },
+        { timeout: 5000 }
+      );
+    } else {
+      onBoundsChange(getBoundsString(map));
+    }
+  }, [map, onBoundsChange]);
+
+  // Fetch on initial mount (for saved-position case where geolocation doesn't fire)
   useEffect(() => {
     const timer = setTimeout(() => onBoundsChange(getBoundsString(map)), 200);
     return () => clearTimeout(timer);
@@ -120,11 +176,13 @@ export default function MapView({ fuel, flyTo }: Props) {
   const minPrice = Math.min(...prices, Infinity);
   const maxPrice = Math.max(...prices, -Infinity);
 
-  // Default center: Darwin
-  const defaultCenter: [number, number] = [-12.46, 130.84];
+  // Use saved map position, or fall back to a broad Australia view
+  const saved = loadMapPosition();
+  const initialCenter: [number, number] = saved ? [saved.lat, saved.lng] : [-25.5, 134.5];
+  const initialZoom = saved ? saved.zoom : 5;
 
   return (
-    <MapContainer center={defaultCenter} zoom={12} className="h-full w-full">
+    <MapContainer center={initialCenter} zoom={initialZoom} className="h-full w-full">
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
