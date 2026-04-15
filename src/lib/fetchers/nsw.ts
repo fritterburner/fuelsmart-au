@@ -1,4 +1,5 @@
 import { Station, StationPrice, FuelCode } from "../types";
+import { parseLocalDateToISO } from "./tz";
 
 const BASE_URL = "https://api.onegov.nsw.gov.au/FuelCheckApp/v1/fuel";
 
@@ -37,11 +38,8 @@ interface NSWResponse {
 }
 
 function parseNSWDate(dateStr: string): string {
-  // Convert "DD/MM/YYYY HH:MM:SS" to ISO 8601
-  const [datePart, timePart] = dateStr.split(" ");
-  if (!datePart || !timePart) return new Date().toISOString();
-  const [day, month, year] = datePart.split("/");
-  return new Date(`${year}-${month}-${day}T${timePart}+11:00`).toISOString();
+  // NSW FuelCheck returns wall time in Australia/Sydney (observes DST).
+  return parseLocalDateToISO(dateStr, "Australia/Sydney");
 }
 
 export async function fetchNSWStations(): Promise<Station[]> {

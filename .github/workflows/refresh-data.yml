@@ -1,0 +1,51 @@
+name: Refresh fuel data
+
+# Hits the app's /api/cron/refresh endpoint every ~15 min.
+# This supplements Vercel's once-daily cron (which is all the Hobby plan allows)
+# so intraday price moves aren't missed.
+#
+# Required repository secrets:
+#   APP_URL       - base URL of the deployed app (e.g. https://fuelsmart-au.vercel.app)
+#   CRON_SECRET   - same value as CRON_SECRET env var in Vercel (bearer auth for the endpoint)
+
+on:
+  schedule:
+    # Every 15 minutes, UTC. GitHub may delay scheduled runs during high load;
+    # actual interval is best-effort ~15-20 min.
+    - cron: "*/15 * * * *"
+  workflow_dispatch: # allow manual trigger from the Actions tab
+
+# Don't let overlapping runs stampede the scrape; if one is still in flight, skip the next.
+concurrency:
+  group: refresh-fuel-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Hit refresh endpoint
+        env:
+          APP_URL: ${{ secrets.APP_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${APP_URL:-}" || -z "${CRON_SECRET:-}" ]]; then
+            echo "::error::APP_URL or CRON_SECRET repository secret is not set"
+            exit 1
+          fi
+          response=$(curl --fail-with-body --silent --show-error \
+            --max-time 90 \
+            --retry 2 --retry-delay 10 --retry-all-errors \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$APP_URL/api/cron/refresh")
+          echo "Response: $response"
+          # Surface the station counts in the run summary for quick visual check.
+          {
+            echo "### Refresh complete"
+            echo ""
+            echo '```json'
+            echo "$response"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
