@@ -15,6 +15,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "FuelSmart AU",
   description: "Find cheapest fuel prices across Australia",
+  other: {
+    // Stops Chrome/Edge offering to translate the page. Our UI is short
+    // labels + numbers that CLD3 routinely misclassifies as German.
+    google: "notranslate",
+  },
 };
 
 export const viewport: Viewport = {
