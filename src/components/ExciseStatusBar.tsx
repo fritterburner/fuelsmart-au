@@ -8,6 +8,7 @@ interface Props {
   loading: boolean;
   error: string | null;
   overrideActive: boolean;
+  override?: { brent_usd: number; aud_usd: number } | null;
 }
 
 function formatAge(fetchedAt: string): string {
@@ -24,9 +25,33 @@ function pct(live: number, base: number): string {
   return `${sign}${Math.abs(delta).toFixed(1)}%`;
 }
 
-export default function ExciseStatusBar({ data, loading, error, overrideActive }: Props) {
+export default function ExciseStatusBar({
+  data,
+  loading,
+  error,
+  overrideActive,
+  override,
+}: Props) {
   const baseClass =
     "flex items-center justify-center gap-3 px-3 py-1.5 text-xs font-medium border-b shadow-sm overflow-hidden";
+
+  // Override-only state (no live data, but user has set manual values) — show those so the map is obviously live
+  if (!data && overrideActive && override) {
+    return (
+      <div className={`${baseClass} bg-purple-50 text-purple-800 border-purple-200`}>
+        <span className="font-semibold whitespace-nowrap">⛽ Excise mode</span>
+        <span className="whitespace-nowrap">
+          Oil ${override.brent_usd.toFixed(2)}{" "}
+          <span className="opacity-70">({pct(override.brent_usd, BASELINE_OIL_USD)})</span>
+        </span>
+        <span className="whitespace-nowrap">
+          AUD {override.aud_usd.toFixed(4)}{" "}
+          <span className="opacity-70">({pct(override.aud_usd, BASELINE_AUD_USD)})</span>
+        </span>
+        <span className="whitespace-nowrap">⚙ manual override</span>
+      </div>
+    );
+  }
 
   if (loading && !data) {
     return (
@@ -38,10 +63,10 @@ export default function ExciseStatusBar({ data, loading, error, overrideActive }
 
   if (error && !data) {
     return (
-      <div className={`${baseClass} bg-red-50 text-red-700 border-red-200`}>
-        <span>⚠ Live market data unavailable — verdicts may be inaccurate.</span>
-        <a href="/excise" className="underline">
-          Use manual override
+      <div className={`${baseClass} bg-red-50 text-red-700 border-red-200 flex-wrap`}>
+        <span>⚠ Live market data unavailable — map pins stay on the default palette until you set values.</span>
+        <a href="/excise" className="underline font-semibold">
+          Set manual override →
         </a>
       </div>
     );

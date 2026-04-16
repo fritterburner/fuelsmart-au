@@ -167,6 +167,7 @@ export default function Home() {
           loading={marketLoading}
           error={marketError}
           overrideActive={!!override}
+          override={override}
         />
       )}
 

@@ -44,7 +44,8 @@ export default function ExciseManualOverride({
     <div className="rounded-lg border border-purple-200 bg-purple-50 p-4">
       <h3 className="font-semibold text-purple-900 mb-1">Manual override</h3>
       <p className="text-sm text-purple-800 mb-3">
-        Plug in your own oil and AUD figures to see how the verdicts change. Session-only — clears on reload.
+        Plug in your own oil and AUD figures to see how the verdicts change. Saved to this browser
+        and used across the map — clear it with the button below to go back to live data.
       </p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
         <label className="block">

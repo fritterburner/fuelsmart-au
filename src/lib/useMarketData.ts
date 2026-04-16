@@ -7,20 +7,61 @@ interface UseMarketDataResult {
   data: MarketData | null;
   loading: boolean;
   error: string | null;
-  /** When set, overrides the cached values (session-only, set via /excise explainer page). */
+  /** When set, overrides the cached values. Persisted to localStorage so it works across pages. */
   override: { brent_usd: number; aud_usd: number } | null;
   setOverride: (o: { brent_usd: number; aud_usd: number } | null) => void;
 }
 
+const OVERRIDE_KEY = "fuelsmart-market-override";
+
+function loadOverride(): { brent_usd: number; aud_usd: number } | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(OVERRIDE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (
+      typeof parsed?.brent_usd === "number" &&
+      typeof parsed?.aud_usd === "number" &&
+      parsed.brent_usd > 0 &&
+      parsed.aud_usd > 0
+    ) {
+      return { brent_usd: parsed.brent_usd, aud_usd: parsed.aud_usd };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Fetches the cached market data from /api/market-data once on mount.
- * Manual override (set from the /excise page) is session-only, kept in state only.
+ * Manual override is persisted to localStorage (`fuelsmart-market-override`) so that
+ * a value set from the /excise page survives navigation back to the map.
  */
 export function useMarketData(enabled: boolean = true): UseMarketDataResult {
   const [data, setData] = useState<MarketData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [override, setOverride] = useState<{ brent_usd: number; aud_usd: number } | null>(null);
+  const [override, setOverrideState] = useState<{ brent_usd: number; aud_usd: number } | null>(
+    null,
+  );
+
+  // Hydrate override from localStorage on mount
+  useEffect(() => {
+    setOverrideState(loadOverride());
+  }, []);
+
+  // Persist override changes
+  const setOverride = (o: { brent_usd: number; aud_usd: number } | null) => {
+    setOverrideState(o);
+    if (typeof window === "undefined") return;
+    if (o) {
+      localStorage.setItem(OVERRIDE_KEY, JSON.stringify(o));
+    } else {
+      localStorage.removeItem(OVERRIDE_KEY);
+    }
+  };
 
   useEffect(() => {
     if (!enabled) return;
