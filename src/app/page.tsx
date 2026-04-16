@@ -68,45 +68,6 @@ export default function Home() {
           {/* Spacer pushes action buttons right */}
           <div className="flex-1 md:flex-none" />
 
-          {/* Mobile: three-dot menu */}
-          <div className="relative md:hidden" ref={menuRef}>
-            <button
-              onClick={() => setMenuOpen((prev) => !prev)}
-              className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg bg-slate-700 active:bg-slate-600 transition-colors"
-              aria-label="Menu"
-              aria-expanded={menuOpen}
-            >
-              <span className="text-xl leading-none">&#8942;</span>
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-56 bg-slate-700 rounded-lg shadow-lg overflow-hidden z-[1100]">
-                <a
-                  href="/trip"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
-                >
-                  <span aria-hidden="true">🚗</span> Trip Planner
-                </a>
-                <ExciseToggle
-                  mode={exciseMode}
-                  onToggle={handleToggleExcise}
-                  variant="mobile-menu"
-                />
-                <a
-                  href="/excise"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
-                >
-                  <span aria-hidden="true">📘</span> How excise is calculated
-                </a>
-                <a
-                  href="/settings"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
-                >
-                  <span aria-hidden="true">⚙️</span> Settings
-                </a>
-              </div>
-            )}
-          </div>
-
           {/* Desktop: inline text buttons */}
           <ExciseToggle
             mode={exciseMode}
@@ -133,13 +94,64 @@ export default function Home() {
             <span className="text-sm font-medium">🚗 Trip Planner</span>
           </a>
 
-          <a
-            href="/settings"
-            className="hidden md:inline-flex items-center justify-center rounded-lg bg-slate-700 md:hover:bg-slate-600 md:px-3 md:py-2 transition-colors"
-            title="Settings"
-          >
-            <span className="text-sm font-medium">Settings</span>
-          </a>
+          {/* Three-dot menu — mobile and desktop */}
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen((prev) => !prev)}
+              className="inline-flex items-center justify-center min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 md:w-9 md:h-9 rounded-lg bg-slate-700 md:hover:bg-slate-600 active:bg-slate-600 transition-colors"
+              aria-label="Menu"
+              aria-expanded={menuOpen}
+            >
+              <span className="text-xl leading-none">&#8942;</span>
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-full mt-1 w-60 bg-slate-700 rounded-lg shadow-lg overflow-hidden z-[1100]">
+                <a
+                  href="/trip"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors md:hidden"
+                >
+                  <span aria-hidden="true">🚗</span> Trip Planner
+                </a>
+                <div className="md:hidden">
+                  <ExciseToggle
+                    mode={exciseMode}
+                    onToggle={handleToggleExcise}
+                    variant="mobile-menu"
+                  />
+                </div>
+                <a
+                  href="/compare"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                >
+                  <span aria-hidden="true">🚙</span> Which car should I drive?
+                </a>
+                <a
+                  href="/discounts"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                >
+                  <span aria-hidden="true">💳</span> Cashback vs detour
+                </a>
+                <a
+                  href="/additives"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                >
+                  <span aria-hidden="true">🧪</span> Fuel additives: worth it?
+                </a>
+                <a
+                  href="/excise"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors border-t border-slate-600"
+                >
+                  <span aria-hidden="true">📘</span> How excise is calculated
+                </a>
+                <a
+                  href="/settings"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors border-t border-slate-600"
+                >
+                  <span aria-hidden="true">⚙️</span> Settings
+                </a>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Row 2: full-width search on mobile only */}
