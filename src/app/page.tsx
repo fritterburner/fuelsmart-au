@@ -18,12 +18,14 @@ export default function Home() {
   const [flyTo, setFlyTo] = useState<[number, number] | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [exciseMode, setExciseMode] = useState(false);
+  const [cheapestHighlightCount, setCheapestHighlightCount] = useState(3);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Hydrate excise-mode preference from localStorage
+  // Hydrate excise-mode + palette preference from localStorage
   useEffect(() => {
     const s = loadSettings();
     setExciseMode(s.exciseMode);
+    setCheapestHighlightCount(s.cheapestHighlightCount);
   }, []);
 
   // Live oil + AUD via /api/market-data (only fetch when excise mode is on)
@@ -179,6 +181,7 @@ export default function Home() {
           exciseMode={exciseMode}
           marketData={marketData}
           marketOverride={override}
+          cheapestHighlightCount={cheapestHighlightCount}
         />
       </div>
 

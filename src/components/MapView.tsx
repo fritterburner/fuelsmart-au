@@ -8,6 +8,7 @@ import { nearestBaseline } from "@/lib/excise/nearest-baseline";
 import { calcVerdict } from "@/lib/excise/calc";
 import { toFuelBucket } from "@/lib/excise/fuel-buckets";
 import type { Verdict, MarketData } from "@/lib/excise/types";
+import { assignRankColors } from "@/lib/rank-palette";
 import StationExcisePopup from "./StationExcisePopup";
 import "leaflet/dist/leaflet.css";
 
@@ -19,13 +20,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
 });
 
-function getPriceColor(price: number, min: number, max: number): string {
-  if (max === min) return "#f59e0b"; // yellow if all same price
-  const ratio = (price - min) / (max - min);
-  if (ratio <= 0.2) return "#22c55e"; // green — cheapest 20%
-  if (ratio >= 0.8) return "#ef4444"; // red — most expensive 20%
-  return "#f59e0b"; // yellow — middle
-}
+// Default-mode palette is now rank-based — see `@/lib/rank-palette`.
 
 const EXCISE_VERDICT_COLOR: Record<Verdict, string> = {
   full: "#059669",        // emerald-600 — full pass-through
@@ -160,9 +155,18 @@ interface Props {
   exciseMode?: boolean;
   marketData?: MarketData | null;
   marketOverride?: { brent_usd: number; aud_usd: number } | null;
+  /** Default-mode palette: number of cheapest visible stations to highlight green. */
+  cheapestHighlightCount?: number;
 }
 
-export default function MapView({ fuel, flyTo, exciseMode = false, marketData = null, marketOverride = null }: Props) {
+export default function MapView({
+  fuel,
+  flyTo,
+  exciseMode = false,
+  marketData = null,
+  marketOverride = null,
+  cheapestHighlightCount = 3,
+}: Props) {
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeFuel, setActiveFuel] = useState<FuelCode>(fuel);
@@ -193,13 +197,21 @@ export default function MapView({ fuel, flyTo, exciseMode = false, marketData = 
     [fuel]
   );
 
-  // Compute price range for colour coding (using activeFuel, which may be a fallback)
+  // Compute rank-based colour for each station with a price. We build a
+  // Map<stationId, color> in the same pass to avoid an O(n²) lookup below.
   const displayFuel = activeFuel;
-  const prices = stations
-    .map((s) => s.prices.find((p) => p.fuel === displayFuel)?.price)
-    .filter(Boolean) as number[];
-  const minPrice = Math.min(...prices, Infinity);
-  const maxPrice = Math.max(...prices, -Infinity);
+  const pricedStations = stations
+    .map((s) => {
+      const p = s.prices.find((pr) => pr.fuel === displayFuel)?.price;
+      return p != null ? { id: s.id, price: p } : null;
+    })
+    .filter((x): x is { id: string; price: number } => x != null);
+  const rankColors = assignRankColors(
+    pricedStations.map((s) => s.price),
+    cheapestHighlightCount,
+  );
+  const colorById = new Map<string, string>();
+  pricedStations.forEach((s, i) => colorById.set(s.id, rankColors[i]));
 
   // Use saved map position, or fall back to a broad Australia view
   const saved = loadMapPosition();
@@ -271,8 +283,8 @@ export default function MapView({ fuel, flyTo, exciseMode = false, marketData = 
           );
         }
 
-        // Default: price-based colouring
-        const color = getPriceColor(priceEntry.price, minPrice, maxPrice);
+        // Default: rank-based colouring (cheapest N green, tail red/orange, middle gray).
+        const color = colorById.get(station.id) ?? "#6b7280";
         const icon = createPriceIcon(priceEntry.price, color);
 
         return (
