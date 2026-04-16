@@ -1,100 +1,52 @@
 /**
- * Fetch live Brent crude + AUD/USD via the Anthropic Messages API with web_search tool.
- * Called from the daily cron in `src/lib/refresh.ts`; result is cached in Redis.
- * Requires ANTHROPIC_API_KEY env var on Vercel.
+ * Orchestrator: fetch live Brent crude + AUD/USD.
+ *
+ * Tries free public sources first (Stooq for Brent, Frankfurter for AUD/USD).
+ * If either fails AND ANTHROPIC_API_KEY is set, falls back to Anthropic web_search.
+ * Otherwise throws — caller (cron or /api/market-data) decides what to do.
+ *
+ * Called from the daily cron in `src/lib/refresh.ts` and on cache-miss from
+ * `/api/market-data`. Result is cached in Redis via `cacheMarketData()`.
  */
 
-interface FetchedMarketData {
+import { fetchFrankfurterAUD } from "./fetchers/frankfurter";
+import { fetchStooqBrent } from "./fetchers/stooq";
+import { fetchAnthropicMarketData } from "./fetchers/anthropic";
+
+export interface FetchedMarketData {
   brent_usd: number;
   aud_usd: number;
   as_of: string;
   source: string;
 }
 
-const SYSTEM_PROMPT =
-  "Search for the current Brent crude oil price in USD per barrel and the current AUD/USD exchange rate. " +
-  'Respond ONLY with raw JSON, no markdown, no backticks: ' +
-  '{"brent_usd":NUMBER,"aud_usd":NUMBER,"source":"brief source string","as_of":"YYYY-MM-DD"}';
-
-const USER_MESSAGE =
-  "Current Brent crude oil price (USD per barrel) and AUD/USD exchange rate. JSON only.";
-
 export async function fetchLiveMarketData(): Promise<FetchedMarketData> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY not set");
-  }
-
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-5-20250929",
-      max_tokens: 1000,
-      system: SYSTEM_PROMPT,
-      tools: [{ type: "web_search_20250305", name: "web_search" }],
-      messages: [{ role: "user", content: USER_MESSAGE }],
-    }),
-  });
-
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`Anthropic API error ${response.status}: ${body.slice(0, 300)}`);
-  }
-
-  const payload = await response.json();
-  const textBlock = extractFinalTextBlock(payload);
-  const parsed = parseJsonResponse(textBlock);
-  validate(parsed);
-  return parsed;
-}
-
-function extractFinalTextBlock(payload: unknown): string {
-  if (
-    !payload ||
-    typeof payload !== "object" ||
-    !("content" in payload) ||
-    !Array.isArray((payload as { content: unknown }).content)
-  ) {
-    throw new Error("Unexpected Anthropic response shape: no content array");
-  }
-  const blocks = (payload as { content: Array<{ type: string; text?: string }> }).content;
-  // Model may emit multiple text blocks; the final JSON is in the last text block.
-  const textBlocks = blocks.filter((b) => b.type === "text" && typeof b.text === "string");
-  if (textBlocks.length === 0) {
-    throw new Error("No text blocks in Anthropic response");
-  }
-  return textBlocks[textBlocks.length - 1].text!;
-}
-
-function parseJsonResponse(raw: string): FetchedMarketData {
-  // Strip markdown fences if the model added them despite the system prompt.
-  let cleaned = raw.trim();
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "");
-  }
   try {
-    return JSON.parse(cleaned) as FetchedMarketData;
-  } catch (e) {
-    throw new Error(`Failed to parse market-data JSON: ${cleaned.slice(0, 200)}`);
+    const [oil, aud] = await Promise.all([fetchStooqBrent(), fetchFrankfurterAUD()]);
+    return {
+      brent_usd: oil,
+      aud_usd: aud,
+      as_of: todayISO(),
+      source: "frankfurter+stooq",
+    };
+  } catch (freeErr) {
+    const freeMsg = (freeErr as Error).message;
+    if (process.env.ANTHROPIC_API_KEY) {
+      try {
+        return await fetchAnthropicMarketData();
+      } catch (anthropicErr) {
+        const anthropicMsg = (anthropicErr as Error).message;
+        throw new Error(
+          `Free sources failed (${freeMsg}); Anthropic fallback also failed (${anthropicMsg})`,
+        );
+      }
+    }
+    throw new Error(
+      `Free market-data sources failed (${freeMsg}); no ANTHROPIC_API_KEY to fall back to`,
+    );
   }
 }
 
-function validate(data: FetchedMarketData): void {
-  if (typeof data.brent_usd !== "number" || data.brent_usd <= 0 || data.brent_usd > 500) {
-    throw new Error(`Invalid brent_usd: ${data.brent_usd}`);
-  }
-  if (typeof data.aud_usd !== "number" || data.aud_usd <= 0 || data.aud_usd > 2) {
-    throw new Error(`Invalid aud_usd: ${data.aud_usd}`);
-  }
-  if (typeof data.as_of !== "string" || data.as_of.length === 0) {
-    throw new Error("Missing as_of date");
-  }
-  if (typeof data.source !== "string") {
-    throw new Error("Missing source");
-  }
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
 }
