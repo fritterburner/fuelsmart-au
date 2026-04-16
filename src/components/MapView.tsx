@@ -4,6 +4,11 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Station, FuelCode } from "@/lib/types";
+import { nearestBaseline } from "@/lib/excise/nearest-baseline";
+import { calcVerdict } from "@/lib/excise/calc";
+import { toFuelBucket } from "@/lib/excise/fuel-buckets";
+import type { Verdict, MarketData } from "@/lib/excise/types";
+import StationExcisePopup from "./StationExcisePopup";
 import "leaflet/dist/leaflet.css";
 
 // Fix Leaflet default marker icons in Next.js
@@ -22,10 +27,27 @@ function getPriceColor(price: number, min: number, max: number): string {
   return "#f59e0b"; // yellow — middle
 }
 
+const EXCISE_VERDICT_COLOR: Record<Verdict, string> = {
+  full: "#059669",        // emerald-600 — full pass-through
+  partial: "#f59e0b",     // amber-500 — partial
+  none: "#dc2626",        // red-600 — not passed through
+  "price-rose": "#2563eb",// blue-600 — price moved above baseline
+  na: "#6b7280",          // gray-500 — fuel not excise-applicable
+};
+
 function createPriceIcon(price: number, color: string): L.DivIcon {
   return L.divIcon({
     className: "price-marker",
     html: `<div style="background:${color};color:white;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;white-space:nowrap;border:1px solid rgba(0,0,0,0.2);text-align:center;">${price.toFixed(1)}</div>`,
+    iconSize: [60, 24],
+    iconAnchor: [30, 12],
+  });
+}
+
+function createExciseIcon(label: string, color: string): L.DivIcon {
+  return L.divIcon({
+    className: "price-marker",
+    html: `<div style="background:${color};color:white;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;white-space:nowrap;border:1px solid rgba(0,0,0,0.2);text-align:center;">${label}</div>`,
     iconSize: [60, 24],
     iconAnchor: [30, 12],
   });
@@ -135,9 +157,12 @@ export function FlyTo({ center }: { center: [number, number] | null }) {
 interface Props {
   fuel: FuelCode;
   flyTo: [number, number] | null;
+  exciseMode?: boolean;
+  marketData?: MarketData | null;
+  marketOverride?: { brent_usd: number; aud_usd: number } | null;
 }
 
-export default function MapView({ fuel, flyTo }: Props) {
+export default function MapView({ fuel, flyTo, exciseMode = false, marketData = null, marketOverride = null }: Props) {
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeFuel, setActiveFuel] = useState<FuelCode>(fuel);
@@ -192,6 +217,61 @@ export default function MapView({ fuel, flyTo }: Props) {
       {stations.map((station) => {
         const priceEntry = station.prices.find((p) => p.fuel === displayFuel);
         if (!priceEntry) return null;
+
+        // Excise mode: recolour pins by pass-through verdict (if market data available).
+        const effectiveMarket = marketOverride ?? marketData;
+        if (exciseMode && effectiveMarket) {
+          const bucket = toFuelBucket(displayFuel);
+          if (bucket === "NA") {
+            const icon = createExciseIcon(priceEntry.price.toFixed(1), EXCISE_VERDICT_COLOR.na);
+            return (
+              <Marker key={station.id} position={[station.lat, station.lng]} icon={icon}>
+                <Popup>
+                  <div className="text-sm">
+                    <strong>{station.name}</strong>
+                    <div className="text-xs text-gray-600 mt-1">
+                      {displayFuel} is not subject to the federal excise cut — no verdict available.
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            );
+          }
+
+          const nearest = nearestBaseline(station.lat, station.lng);
+          const verdict = calcVerdict({
+            pumpPriceCpl: priceEntry.price,
+            fuel: bucket,
+            baseline: nearest.city,
+            liveOilUsd: effectiveMarket.brent_usd,
+            liveAudUsd: effectiveMarket.aud_usd,
+          });
+
+          const color = EXCISE_VERDICT_COLOR[verdict.verdict];
+          // Show pass-through % as the label (or price if price-rose / na).
+          const label =
+            verdict.verdict === "price-rose" || verdict.verdict === "na"
+              ? priceEntry.price.toFixed(1)
+              : `${Math.round(Math.max(0, Math.min(100, verdict.passthroughPct)))}%`;
+          const icon = createExciseIcon(label, color);
+
+          return (
+            <Marker key={station.id} position={[station.lat, station.lng]} icon={icon}>
+              <Popup>
+                <StationExcisePopup
+                  station={station}
+                  displayFuel={displayFuel}
+                  pumpPriceCpl={priceEntry.price}
+                  pumpPriceUpdated={priceEntry.updated}
+                  verdict={verdict}
+                  nearest={nearest}
+                />
+              </Popup>
+            </Marker>
+          );
+        }
+
+        // Default: price-based colouring
         const color = getPriceColor(priceEntry.price, minPrice, maxPrice);
         const icon = createPriceIcon(priceEntry.price, color);
 

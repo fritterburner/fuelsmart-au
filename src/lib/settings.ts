@@ -8,6 +8,12 @@ export interface UserSettings {
   homeLat: number | null;
   homeLng: number | null;
   homeLabel: string;
+  /**
+   * When true, map pins are coloured by federal-excise pass-through verdict
+   * (green = full pass-through, amber = partial, red = none, blue = price rose).
+   * When false, pins use the default cheap/mid/expensive palette.
+   */
+  exciseMode: boolean;
 }
 
 const STORAGE_KEY = "fuelsmart-settings";
@@ -20,6 +26,7 @@ const DEFAULTS: UserSettings = {
   homeLat: null,
   homeLng: null,
   homeLabel: "",
+  exciseMode: false,
 };
 
 export function loadSettings(): UserSettings {

@@ -4,7 +4,8 @@ import { fetchQLDStations } from "./fetchers/qld";
 import { fetchWAStations } from "./fetchers/wa";
 import { fetchNSWStations } from "./fetchers/nsw";
 import { fetchTASStations } from "./fetchers/tas";
-import { cacheStations, setStateLastUpdate } from "./cache";
+import { cacheStations, setStateLastUpdate, cacheMarketData } from "./cache";
+import { fetchLiveMarketData } from "./excise/fetch-market-data";
 
 export async function refreshAllData(): Promise<{
   nt: number;
@@ -14,6 +15,7 @@ export async function refreshAllData(): Promise<{
   tas: number;
   total: number;
   errors: string[];
+  marketData: { source: string; as_of: string } | { error: string };
 }> {
   const errors: string[] = [];
   const allStations: Station[] = [];
@@ -74,6 +76,19 @@ export async function refreshAllData(): Promise<{
     await cacheStations(allStations);
   }
 
+  // Refresh market data (Brent crude + AUD/USD) for excise pass-through calcs.
+  // Failure here must not kill the station refresh.
+  let marketData: { source: string; as_of: string } | { error: string };
+  try {
+    const fetched = await fetchLiveMarketData();
+    await cacheMarketData(fetched);
+    marketData = { source: fetched.source, as_of: fetched.as_of };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    errors.push(`MarketData: ${msg}`);
+    marketData = { error: msg };
+  }
+
   return {
     nt: ntCount,
     qld: qldCount,
@@ -82,5 +97,6 @@ export async function refreshAllData(): Promise<{
     tas: tasCount,
     total: allStations.length,
     errors,
+    marketData,
   };
 }

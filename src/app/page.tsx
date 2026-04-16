@@ -4,7 +4,11 @@ import dynamic from "next/dynamic";
 import { useState, useRef, useEffect } from "react";
 import FuelSelect from "@/components/FuelSelect";
 import LocationSearch from "@/components/LocationSearch";
+import ExciseToggle from "@/components/ExciseToggle";
+import ExciseStatusBar from "@/components/ExciseStatusBar";
 import { FuelCode } from "@/lib/types";
+import { loadSettings, saveSettings } from "@/lib/settings";
+import { useMarketData } from "@/lib/useMarketData";
 
 // Leaflet must be loaded client-side only (no SSR)
 const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
@@ -13,7 +17,25 @@ export default function Home() {
   const [fuel, setFuel] = useState<FuelCode>("U91");
   const [flyTo, setFlyTo] = useState<[number, number] | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [exciseMode, setExciseMode] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Hydrate excise-mode preference from localStorage
+  useEffect(() => {
+    const s = loadSettings();
+    setExciseMode(s.exciseMode);
+  }, []);
+
+  // Live oil + AUD via /api/market-data (only fetch when excise mode is on)
+  const { data: marketData, loading: marketLoading, error: marketError, override } =
+    useMarketData(exciseMode);
+
+  function handleToggleExcise(next: boolean) {
+    setExciseMode(next);
+    const current = loadSettings();
+    saveSettings({ ...current, exciseMode: next });
+    setMenuOpen(false);
+  }
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -57,12 +79,23 @@ export default function Home() {
               <span className="text-xl leading-none">&#8942;</span>
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-48 bg-slate-700 rounded-lg shadow-lg overflow-hidden z-[1100]">
+              <div className="absolute right-0 top-full mt-1 w-56 bg-slate-700 rounded-lg shadow-lg overflow-hidden z-[1100]">
                 <a
                   href="/trip"
                   className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
                 >
                   <span aria-hidden="true">🚗</span> Trip Planner
+                </a>
+                <ExciseToggle
+                  mode={exciseMode}
+                  onToggle={handleToggleExcise}
+                  variant="mobile-menu"
+                />
+                <a
+                  href="/excise"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                >
+                  <span aria-hidden="true">📘</span> How excise is calculated
                 </a>
                 <a
                   href="/settings"
@@ -75,6 +108,23 @@ export default function Home() {
           </div>
 
           {/* Desktop: inline text buttons */}
+          <ExciseToggle
+            mode={exciseMode}
+            onToggle={handleToggleExcise}
+            variant="desktop"
+          />
+
+          {exciseMode && (
+            <a
+              href="/excise"
+              className="hidden md:inline-flex items-center justify-center rounded-lg bg-slate-700 md:hover:bg-slate-600 w-9 h-9 transition-colors text-sm"
+              title="How excise is calculated"
+              aria-label="How excise is calculated"
+            >
+              ?
+            </a>
+          )}
+
           <a
             href="/trip"
             className="hidden md:inline-flex items-center justify-center rounded-lg bg-emerald-600 md:hover:bg-emerald-700 md:px-4 md:py-2 transition-colors"
@@ -98,9 +148,25 @@ export default function Home() {
         </div>
       </header>
 
+      {/* Excise mode status bar — visible only when mode is on */}
+      {exciseMode && (
+        <ExciseStatusBar
+          data={marketData}
+          loading={marketLoading}
+          error={marketError}
+          overrideActive={!!override}
+        />
+      )}
+
       {/* Map */}
       <div className="flex-1 relative">
-        <MapView fuel={fuel} flyTo={flyTo} />
+        <MapView
+          fuel={fuel}
+          flyTo={flyTo}
+          exciseMode={exciseMode}
+          marketData={marketData}
+          marketOverride={override}
+        />
       </div>
 
       {/* Attribution footer */}
