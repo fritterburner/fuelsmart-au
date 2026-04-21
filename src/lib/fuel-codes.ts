@@ -8,15 +8,15 @@ export const FUEL_FALLBACKS: Partial<Record<FuelCode, FuelCode[]>> = {
 };
 
 export const FUEL_TYPES: FuelType[] = [
-  { code: "U91", name: "Unleaded 91" },
-  { code: "DL", name: "Diesel" },
-  { code: "E10", name: "Ethanol 94 (E10)" },
-  { code: "P95", name: "Premium 95" },
-  { code: "P98", name: "Premium 98" },
-  { code: "PD", name: "Premium Diesel" },
-  { code: "LPG", name: "LPG" },
-  { code: "E85", name: "E85" },
-  { code: "LAF", name: "Low Aromatic / OPAL" },
+  { code: "U91", name: "Unleaded 91", short: "91", primary: true },
+  { code: "DL",  name: "Diesel",      short: "Diesel", primary: true },
+  { code: "P95", name: "Premium 95",  short: "95", primary: true },
+  { code: "P98", name: "Premium 98",  short: "98", primary: true },
+  { code: "E10", name: "Ethanol 94 (E10)", short: "E10", primary: false },
+  { code: "PD",  name: "Premium Diesel",    short: "Premium Diesel", primary: false },
+  { code: "LPG", name: "LPG",               short: "LPG", primary: false },
+  { code: "E85", name: "E85",               short: "E85", primary: false },
+  { code: "LAF", name: "Low Aromatic / OPAL", short: "OPAL", primary: false },
 ];
 
 // QLD FPD API uses numeric FuelId

@@ -32,6 +32,10 @@ export type FuelCode =
 export interface FuelType {
   code: FuelCode;
   name: string;
+  /** Short label used in chip-style selectors (e.g. "91", "Diesel", "95"). */
+  short: string;
+  /** True for the handful of fuels shown as primary chips; false for rarer types hidden under a disclosure. */
+  primary: boolean;
 }
 
 export interface TripStop {
