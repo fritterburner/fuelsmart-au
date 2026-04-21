@@ -313,7 +313,7 @@ export default function MapView({
                 {station.address}, {station.suburb} {station.state} {station.postcode}
                 <hr className="my-1" />
                 {station.prices.map((p) => {
-                  const eff = applyToStation(p.price, activeDiscounts);
+                  const eff = applyToStation(station, p.price, activeDiscounts);
                   const hasDiscount = eff.applied.length > 0;
                   return (
                     <div

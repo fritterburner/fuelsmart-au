@@ -54,6 +54,8 @@ export default function DiscountsPage() {
         value: 4,
         appliesTo: "both",
         enabled: true,
+        brands: [],
+        states: [],
       },
     ]);
   }

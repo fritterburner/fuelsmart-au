@@ -13,6 +13,8 @@ const docket: Discount = {
   value: 4,
   appliesTo: "both",
   enabled: true,
+  brands: [],
+  states: [],
 };
 
 const amex: Discount = {
@@ -22,6 +24,8 @@ const amex: Discount = {
   value: 2,
   appliesTo: "both",
   enabled: true,
+  brands: [],
+  states: [],
 };
 
 const rebate: Discount = {
@@ -31,6 +35,8 @@ const rebate: Discount = {
   value: 5,
   appliesTo: "both",
   enabled: true,
+  brands: [],
+  states: [],
 };
 
 describe("effectiveCpl", () => {
@@ -71,6 +77,8 @@ describe("effectiveCpl", () => {
       value: 500,
       appliesTo: "both",
       enabled: true,
+      brands: [],
+      states: [],
     };
     const { cpl } = effectiveCpl(220, 50, [monster], "A");
     expect(cpl).toBe(0);
@@ -112,46 +120,137 @@ describe("evaluate", () => {
 });
 
 describe("applyToStation", () => {
+  // Minimal station fixture — only the fields applyToStation reads.
+  function stationFixture(overrides: { brand?: string; state?: string } = {}) {
+    return {
+      id: "s1",
+      name: "Test Servo",
+      brand: overrides.brand ?? "Shell",
+      brandCode: "SHL",
+      address: "1 Test St",
+      suburb: "Testville",
+      state: (overrides.state ?? "NSW") as "NSW" | "QLD" | "NT" | "WA" | "TAS" | "ACT",
+      postcode: "0000",
+      lat: 0,
+      lng: 0,
+      prices: [],
+    };
+  }
+
+  // New-shape Discount builder — brands/states default to "any".
+  function mk(over: Partial<Discount>): Discount {
+    return {
+      id: "x",
+      name: "x",
+      type: "fixed_cpl",
+      value: 4,
+      appliesTo: "both",
+      enabled: true,
+      brands: [],
+      states: [],
+      ...over,
+    };
+  }
+
   test("returns rack price when no discounts supplied", () => {
-    const res = applyToStation(220, []);
+    const res = applyToStation(stationFixture(), 220, []);
     expect(res.effectiveCpl).toBe(220);
     expect(res.applied).toEqual([]);
   });
 
   test("returns rack price when all discounts are disabled", () => {
-    const res = applyToStation(220, [{ ...docket, enabled: false }]);
+    const res = applyToStation(stationFixture(), 220, [mk({ enabled: false })]);
     expect(res.effectiveCpl).toBe(220);
     expect(res.applied).toEqual([]);
   });
 
-  test("applies a 4 c/L fixed discount directly", () => {
-    const res = applyToStation(220, [docket]);
+  test("applies a 4 c/L fixed discount directly (no filters)", () => {
+    const res = applyToStation(stationFixture(), 220, [mk({ value: 4 })]);
     expect(res.effectiveCpl).toBeCloseTo(216, 5);
     expect(res.applied).toHaveLength(1);
   });
 
   test("applies a % cashback as effective = rack × (1 − pct/100)", () => {
-    const res = applyToStation(200, [{ ...amex, value: 2 }]);
+    const res = applyToStation(stationFixture(), 200, [
+      mk({ type: "percent_cashback", value: 2 }),
+    ]);
     expect(res.effectiveCpl).toBeCloseTo(196, 5);
   });
 
   test("stacks fixed c/L + % cashback for a lower effective price than either alone", () => {
-    const res = applyToStation(220, [docket, amex]);
+    const res = applyToStation(stationFixture(), 220, [
+      mk({ id: "d1", value: 4 }),
+      mk({ id: "d2", type: "percent_cashback", value: 2 }),
+    ]);
     // 220 - 4 = 216, then * 0.98 = 211.68
     expect(res.effectiveCpl).toBeCloseTo(211.68, 2);
     expect(res.applied).toHaveLength(2);
   });
 
-  test("ignores A-only and B-only side-scoped discounts (map popup is unsided)", () => {
-    const aOnly: Discount = { ...docket, appliesTo: "A" };
-    const bOnly: Discount = { ...amex, appliesTo: "B" };
-    const res = applyToStation(220, [aOnly, bOnly]);
+  // ── Brand filter ─────────────────────────────────────────────────────
+  test("applies discount when station.brand is in discount.brands", () => {
+    const res = applyToStation(stationFixture({ brand: "Shell" }), 220, [
+      mk({ brands: ["Shell", "BP"] }),
+    ]);
+    expect(res.effectiveCpl).toBeCloseTo(216, 5);
+  });
+
+  test("skips discount when station.brand is NOT in discount.brands", () => {
+    const res = applyToStation(stationFixture({ brand: "United" }), 220, [
+      mk({ brands: ["Shell", "BP"] }),
+    ]);
     expect(res.effectiveCpl).toBe(220);
     expect(res.applied).toEqual([]);
   });
 
+  test("empty brands[] means any brand matches", () => {
+    const res = applyToStation(stationFixture({ brand: "Little Known Servo" }), 220, [
+      mk({ brands: [] }),
+    ]);
+    expect(res.effectiveCpl).toBeCloseTo(216, 5);
+  });
+
+  // ── State filter ─────────────────────────────────────────────────────
+  test("applies discount when station.state is in discount.states", () => {
+    const res = applyToStation(stationFixture({ state: "NT" }), 220, [
+      mk({ states: ["NT"] }),
+    ]);
+    expect(res.effectiveCpl).toBeCloseTo(216, 5);
+  });
+
+  test("skips discount when station.state is NOT in discount.states", () => {
+    const res = applyToStation(stationFixture({ state: "QLD" }), 220, [
+      mk({ states: ["NT"] }),
+    ]);
+    expect(res.effectiveCpl).toBe(220);
+  });
+
+  // ── AND semantics: all filters must match ────────────────────────────
+  test("AND: brand matches but state doesn't → skip", () => {
+    const res = applyToStation(stationFixture({ brand: "United", state: "QLD" }), 220, [
+      mk({ brands: ["United"], states: ["NT"] }), // AANT-in-NT pattern
+    ]);
+    expect(res.effectiveCpl).toBe(220);
+  });
+
+  test("AND: state matches but brand doesn't → skip", () => {
+    const res = applyToStation(stationFixture({ brand: "Shell", state: "NT" }), 220, [
+      mk({ brands: ["United"], states: ["NT"] }),
+    ]);
+    expect(res.effectiveCpl).toBe(220);
+  });
+
+  test("AND: both match → apply", () => {
+    const res = applyToStation(stationFixture({ brand: "United", state: "NT" }), 220, [
+      mk({ brands: ["United"], states: ["NT"] }),
+    ]);
+    expect(res.effectiveCpl).toBeCloseTo(216, 5);
+  });
+
   test("ignores fixed-$ rebates (map popup has no fill-size context)", () => {
-    const res = applyToStation(220, [rebate]);
+    const res = applyToStation(stationFixture(), 220, [
+      mk({ type: "fixed_rebate", value: 5 }),
+    ]);
     expect(res.effectiveCpl).toBe(220);
     expect(res.applied).toEqual([]);
   });

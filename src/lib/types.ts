@@ -4,6 +4,8 @@ export interface StationPrice {
   updated: string; // ISO 8601
 }
 
+export type StateCode = "NT" | "QLD" | "WA" | "NSW" | "ACT" | "SA" | "VIC" | "TAS";
+
 export interface Station {
   id: string; // e.g. "nt-42", "qld-61401106", "wa-bp-newstead"
   name: string;
@@ -11,7 +13,7 @@ export interface Station {
   brandCode: string;
   address: string;
   suburb: string;
-  state: "NT" | "QLD" | "WA" | "NSW" | "ACT" | "SA" | "VIC" | "TAS";
+  state: StateCode;
   postcode: string;
   lat: number;
   lng: number;

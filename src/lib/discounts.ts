@@ -1,7 +1,11 @@
-// Discount evaluation logic for the cashback vs. detour calculator.
+// Discount evaluation logic.
 // Pure functions — no side effects, safe to unit-test.
 
+import type { Station, StateCode } from "./types";
+
 export type DiscountType = "fixed_cpl" | "percent_cashback" | "fixed_rebate";
+
+/** Kept for backwards compatibility with the A/B calculator — unused by the map popup. */
 export type AppliesTo = "both" | "A" | "B";
 
 export interface Discount {
@@ -10,8 +14,19 @@ export interface Discount {
   type: DiscountType;
   /** For fixed_cpl: cents off per litre. For percent_cashback: % (e.g. 2 for 2%). For fixed_rebate: dollars back per fill. */
   value: number;
+  /** Kept for the A/B calculator; map popup ignores it. */
   appliesTo: AppliesTo;
   enabled: boolean;
+  /**
+   * Canonical brand names this discount applies to. Empty = applies to any
+   * brand. Match uses the normalised brand set by the fetcher layer — see
+   * `src/lib/brands.ts`.
+   */
+  brands: string[];
+  /**
+   * AU state codes this discount applies in. Empty = applies in any state.
+   */
+  states: StateCode[];
 }
 
 export interface StationQuote {
@@ -114,26 +129,32 @@ export function evaluate({
 /**
  * Map-popup-scoped discount application. Unlike `effectiveCpl` (which is
  * used by the A/B comparison view with a known fill size), this helper:
- *   • only considers `appliesTo: "both"` discounts (popups aren't sided)
+ *   • filters by `brands` (empty = any) and `states` (empty = any)
  *   • skips `fixed_rebate` discounts (they need fill-size context)
  *   • stacks the remaining `fixed_cpl` + `percent_cashback` for the
  *     lowest effective per-litre price
  * Returns `effectiveCpl === pumpCpl` and `applied === []` if nothing matches.
  */
 export function applyToStation(
+  station: Pick<Station, "brand" | "state">,
   pumpCpl: number,
   discounts: Discount[],
 ): {
   effectiveCpl: number;
   applied: Array<{ id: string; name: string; valueCpl: number }>;
 } {
-  const applicable = discounts.filter(
-    (d) =>
-      d.enabled &&
-      d.appliesTo === "both" &&
-      (d.type === "fixed_cpl" || d.type === "percent_cashback"),
-  );
-  const { cpl, applied } = effectiveCpl(pumpCpl, 0, applicable, "A");
+  const applicable = discounts.filter((d) => {
+    if (!d.enabled) return false;
+    if (d.type !== "fixed_cpl" && d.type !== "percent_cashback") return false;
+    if (d.brands.length > 0 && !d.brands.includes(station.brand)) return false;
+    if (d.states.length > 0 && !d.states.includes(station.state)) return false;
+    return true;
+  });
+  // effectiveCpl's `side` parameter and its appliesTo check don't affect the
+  // result here because every `applicable` discount has already been narrowed
+  // to the popup's brand+state context.
+  const active = applicable.map((d) => ({ ...d, appliesTo: "both" as AppliesTo }));
+  const { cpl, applied } = effectiveCpl(pumpCpl, 0, active, "A");
   return { effectiveCpl: cpl, applied };
 }
 
