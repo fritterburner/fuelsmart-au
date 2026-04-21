@@ -27,7 +27,7 @@
 | P1.4 | Discounts not discoverable | **Confirmed** — menu-only, no first-run prompt | `src/app/discounts/page.tsx` |
 | P2.1 | Vehicle setup is engineering-spec | **Confirmed** — no CarQuery; manual L/100km + tank | `src/components/TripForm.tsx:449–485` |
 | P2.2 | "Arrive with full tank" buried | **Partially correct** — a visible checkbox, but page headline is just "Trip Planner" | `src/components/TripForm.tsx:507–522` |
-| P2.3 | Jerry cans default-visible | **Confirmed, but I disagree it's wrong** — see §3 | `src/components/TripForm.tsx:474–483` |
+| P2.3 | Jerry cans default-visible | **Confirmed — compromise agreed** (tickbox reveal, not "Advanced options" burial) | `src/components/TripForm.tsx:474–483` |
 | P2.4 | 10% reserve too low for remote routes | **Confirmed** — no auto-bump; defer | `src/components/TripForm.tsx:535` |
 | P2.5 | Google Maps import unclear | **Already handled** — errors + validation exist; just polish the placeholder | `src/components/TripForm.tsx:239–262` |
 | P2.6 | "Save" button ambiguous | **Confirmed** — does save to localStorage; 1-line copy fix | `src/components/TripForm.tsx:79–93` |
@@ -47,7 +47,7 @@
 ## 2. Where I disagree with the reviewer
 
 - **P0.2 (SA/VIC/ACT coverage) is not a P0.** The fix the reviewer proposes ("investigate SA SafePrice API" / "scope VIC scraping") is a multi-week data-integration project, not a UX trust repair. The real P0 trust failure is **the global "updated daily" label**, which is already on the list. The coverage story is adequately handled today in the trip planner (warnings) and the home map shows empty — that's honest, not deceptive. I'd move this to a separate design doc.
-- **P2.3 (jerry cans under Advanced) — disagree.** Target user base per memory includes NT regional drivers and grey nomads (memory: "Big Lap" segment, CMCA, BCF sponsorship fit). Jerry-can capacity is **more** relevant to them than to the Brisbane→Gold Coast case, and defaulting `0L` means it visually disappears for users who don't need it anyway. Keep as-is.
+- **P2.3 (jerry cans) — compromise.** Reviewer wanted it under "Advanced options"; I pushed back because the target audience (NT regional, grey nomads) genuinely uses jerry cans. Agreed middle ground: a **binary tickbox** ("I'm carrying jerry cans") as the default control. Only if ticked does the litre-input reveal. Simpler mental model, one click for the nomads who need it, zero noise for the Brisbane→Gold Coast case. Folded into Commit 5.
 - **P2.7 (return trip) resolved.** Verification shows it's a single OSRM call with UI signal ("route back via same stops"). No action.
 - **P1.1 (fuel selector) framing.** Reviewer calls it a "pill bar" — it's a native `<select>`. That changes the right fix: swap for a primary-chip + "more" pattern rather than shrinking an existing pill bar. Also: OPAL geofencing is a good call, but the NT/SA/WA remote regions are actually where most of this app's traffic comes from, so OPAL should probably **stay visible** here specifically. Marginal call — keep OPAL as a non-primary but not-hidden option.
 
@@ -255,14 +255,15 @@ Six commits, each small enough to review in one sitting. Ordered by ROI per hour
 
 ---
 
-### Commit 5 — Trip Planner framing (P2.2 headline, P2.5 placeholder, P2.6 Save rename)
+### Commit 5 — Trip Planner framing (P2.2 headline, P2.3 jerry-can tickbox, P2.5 placeholder, P2.6 Save rename)
 
-**Why:** Three small copy/UX polishes on the Trip Planner. Cheap to ship together because they touch the same file.
+**Why:** Four small copy/UX polishes on the Trip Planner. Cheap to ship together because they touch the same file.
 
 **Files:**
 - Modify: `src/app/trip/page.tsx` (page headline + subhead)
 - Modify: `src/components/TripForm.tsx:79–93` (Save button rename + helper text)
 - Modify: `src/components/TripForm.tsx:239–262` (Google Maps import: placeholder example)
+- Modify: `src/components/TripForm.tsx:474–483` (jerry-can field → tickbox + conditional reveal)
 
 **Changes:**
 
@@ -285,7 +286,37 @@ Six commits, each small enough to review in one sitting. Ordered by ROI per hour
    ```
    Plus a 1-line hint under the field: `Paste a share link from Google Maps → Directions → Share.`
 
-**Risk:** Low — pure copy/placeholder changes.
+4. Jerry-can field → tickbox reveal. In `TripForm.tsx:474–483`, replace the always-visible L input with a two-stage control:
+   ```tsx
+   <label className="flex items-center gap-2">
+     <input
+       type="checkbox"
+       checked={form.hasJerryCans}
+       onChange={(e) =>
+         setForm({
+           ...form,
+           hasJerryCans: e.target.checked,
+           jerryL: e.target.checked ? form.jerryL || 20 : 0,
+         })
+       }
+     />
+     <span>I'm carrying jerry cans</span>
+   </label>
+   {form.hasJerryCans && (
+     <input
+       type="number"
+       min={0}
+       step={1}
+       value={form.jerryL}
+       onChange={(e) => setForm({ ...form, jerryL: Number(e.target.value) })}
+       className="..." // same classes as the other numeric inputs
+       placeholder="Litres (e.g. 20)"
+     />
+   )}
+   ```
+   Add `hasJerryCans: boolean` to the form state type and default to `false`. If a saved vehicle has `jerryL > 0`, set `hasJerryCans: true` on load so it still displays correctly. Default litres when first ticked: 20L (standard jerry can size).
+
+**Risk:** Low — copy/placeholder changes plus one conditional render. The jerry-can save/load needs the `hasJerryCans: jerryL > 0` reconciliation on vehicle-profile load (verify `src/lib/vehicles.ts` round-trip).
 
 **Commit message:** `feat: clarify Trip Planner headline and input labelling`
 
@@ -335,9 +366,9 @@ These are **not** in this plan. Each warrants its own design pass.
 | 2. Popup upgrades | 1 helper extract, 1 Jest file, 2 popup edits | ~1.5h |
 | 3. Fuel type reorg | Refactor + chip design | ~1.5h |
 | 4. Discount discoverability | Tests + helper + nudge + popup rework | ~3h |
-| 5. Trip Planner framing | Copy only | ~30min |
+| 5. Trip Planner framing | Copy + jerry-can tickbox reveal | ~1h |
 | 6. A11y sweep | Audit + fixes | ~2h |
-| **Total** | | **~9–10h** |
+| **Total** | | **~9.5–10.5h** |
 
 ---
 
