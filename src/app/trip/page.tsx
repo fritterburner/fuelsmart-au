@@ -79,6 +79,17 @@ export default function TripPage() {
       </div>
 
       <div className="px-3 py-4 space-y-4 md:max-w-5xl md:mx-auto md:px-4 md:py-6 md:space-y-6">
+        {/* Hero — explains what the planner actually does */}
+        <section>
+          <h2 className="text-xl md:text-2xl font-semibold text-gray-900 leading-tight">
+            Arrive with a full tank — cheapest fuel along your route.
+          </h2>
+          <p className="text-sm text-gray-600 mt-1">
+            We plan your fill-ups so you reach your destination with whatever
+            tank level you choose — not just &quot;not empty&quot;.
+          </p>
+        </section>
+
         <TripForm onSubmit={handleSubmit} loading={loading} />
 
         {error && (

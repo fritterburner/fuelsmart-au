@@ -14,12 +14,15 @@ interface TripFormData {
   tank: number;
   consumption: number;
   jerry: number;
+  hasJerryCans: boolean;
   startingFuelPct: number;
   allowFallback: boolean;
   arriveFull: boolean;
   reservePct: number;
   returnTrip: boolean;
 }
+
+const DEFAULT_JERRY_LITRES = 20;
 
 interface Props {
   onSubmit: (data: TripFormData & {
@@ -39,6 +42,7 @@ export default function TripForm({ onSubmit, loading }: Props) {
     tank: 45,
     consumption: 10.5,
     jerry: 0,
+    hasJerryCans: false,
     startingFuelPct: 100,
     allowFallback: true,
     arriveFull: false,
@@ -72,6 +76,7 @@ export default function TripForm({ onSubmit, loading }: Props) {
         tank: v.tankSize,
         consumption: v.consumption,
         jerry: v.jerryCapacity,
+        hasJerryCans: v.jerryCapacity > 0,
       }));
     }
   }
@@ -246,8 +251,9 @@ export default function TripForm({ onSubmit, loading }: Props) {
             type="text"
             value={gmapsUrl}
             onChange={(e) => setGmapsUrl(e.target.value)}
-            placeholder="Paste a Google Maps URL..."
+            placeholder="https://maps.app.goo.gl/... or google.com/maps/dir/..."
             className="flex-1 px-3 py-2.5 min-h-[44px] border rounded-lg text-sm"
+            aria-describedby="gmaps-hint"
           />
           <button
             type="button"
@@ -258,6 +264,9 @@ export default function TripForm({ onSubmit, loading }: Props) {
             {gmapsLoading ? "Importing..." : "Import"}
           </button>
         </div>
+        <p id="gmaps-hint" className="text-xs text-gray-500 mt-1">
+          In Google Maps: Directions → Share → Copy link.
+        </p>
         {gmapsError && <p className="text-red-600 text-xs mt-1">{gmapsError}</p>}
       </details>
 
@@ -402,12 +411,12 @@ export default function TripForm({ onSubmit, loading }: Props) {
 
       {/* Vehicle profile selector + settings */}
       <div>
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
           <label className="text-sm font-medium text-gray-700">Vehicle</label>
           <select
             value={selectedVehicleId}
             onChange={(e) => handleSelectVehicle(e.target.value)}
-            className="flex-1 px-2 py-1.5 min-h-[36px] border rounded-lg text-sm bg-white"
+            className="flex-1 min-w-[140px] px-2 py-1.5 min-h-[36px] border rounded-lg text-sm bg-white"
           >
             <option value="">Custom</option>
             {vehicles.map((v) => (
@@ -421,7 +430,7 @@ export default function TripForm({ onSubmit, loading }: Props) {
             onClick={handleSaveVehicle}
             className="px-2.5 py-1.5 min-h-[36px] text-xs font-medium text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 active:bg-emerald-100 transition-colors whitespace-nowrap"
           >
-            Save
+            Remember on this device
           </button>
           {selectedVehicleId && (
             <button
@@ -433,9 +442,12 @@ export default function TripForm({ onSubmit, loading }: Props) {
             </button>
           )}
         </div>
+        <p className="text-xs text-gray-500 mb-2">
+          Saved to your browser — not synced across devices.
+        </p>
 
-        {/* Vehicle settings — 2x2 on mobile, 4-col on md+ */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        {/* Vehicle settings — 2x2 on mobile, 3-col on md+ (jerry cans moved below) */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Fuel Type</label>
             <select
@@ -458,7 +470,7 @@ export default function TripForm({ onSubmit, loading }: Props) {
               required
             />
           </div>
-          <div>
+          <div className="col-span-2 md:col-span-1">
             <label className="block text-sm font-medium text-gray-700 mb-1">L/100km</label>
             <input
               type="number"
@@ -471,17 +483,45 @@ export default function TripForm({ onSubmit, loading }: Props) {
               required
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Jerry Cans (L)</label>
+        </div>
+
+        {/* Jerry cans — opt-in tickbox, litres input only when carrying */}
+        <div className="mt-3">
+          <label className="inline-flex items-center gap-2 cursor-pointer">
             <input
-              type="number"
-              value={form.jerry}
-              onChange={(e) => setVehicleField("jerry", Number(e.target.value))}
-              className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
-              min={0}
-              max={200}
+              type="checkbox"
+              checked={form.hasJerryCans}
+              onChange={(e) => {
+                const checked = e.target.checked;
+                setSelectedVehicleId("");
+                setForm((f) => ({
+                  ...f,
+                  hasJerryCans: checked,
+                  jerry: checked ? (f.jerry > 0 ? f.jerry : DEFAULT_JERRY_LITRES) : 0,
+                }));
+              }}
+              className="w-5 h-5 accent-emerald-600"
             />
-          </div>
+            <span className="text-sm text-gray-700">I&apos;m carrying jerry cans</span>
+          </label>
+          {form.hasJerryCans && (
+            <div className="mt-2 flex items-center gap-2 max-w-xs">
+              <label htmlFor="jerry-litres" className="text-sm text-gray-700 whitespace-nowrap">
+                Capacity (L)
+              </label>
+              <input
+                id="jerry-litres"
+                type="number"
+                value={form.jerry}
+                onChange={(e) => setVehicleField("jerry", Number(e.target.value))}
+                className="w-24 px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
+                min={0}
+                max={200}
+                placeholder={String(DEFAULT_JERRY_LITRES)}
+              />
+              <span className="text-xs text-gray-500">standard jerry can ≈ 20L</span>
+            </div>
+          )}
         </div>
       </div>
 
