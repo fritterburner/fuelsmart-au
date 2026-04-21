@@ -1,6 +1,7 @@
 import { Station, StationPrice, FuelCode } from "../types";
 import { parseLocalDateToISO } from "./tz";
 import { normaliseBrand } from "../brands";
+import { isRealisticPrice } from "../price-sanity";
 
 const BASE_URL = "https://api.onegov.nsw.gov.au/FuelCheckTasApp/v1/fuel";
 
@@ -68,6 +69,7 @@ export async function fetchTASStations(): Promise<Station[]> {
   for (const p of data.prices) {
     const fuelCode = TAS_FUEL_MAP[p.fueltype];
     if (!fuelCode) continue;
+    if (!isRealisticPrice(p.price)) continue;
 
     if (!priceMap.has(p.stationcode)) priceMap.set(p.stationcode, []);
     priceMap.get(p.stationcode)!.push({

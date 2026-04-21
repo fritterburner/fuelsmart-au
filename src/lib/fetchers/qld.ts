@@ -1,5 +1,6 @@
 import { Station, StationPrice } from "../types";
 import { QLD_FUEL_MAP, QLD_BRAND_MAP } from "../fuel-codes";
+import { isRealisticPrice } from "../price-sanity";
 
 const BASE_URL = "https://fppdirectapi-prod.fuelpricesqld.com.au";
 
@@ -57,10 +58,13 @@ export async function fetchQLDStations(): Promise<Station[]> {
     const fuelCode = QLD_FUEL_MAP[p.FuelId];
     if (!fuelCode) continue;
 
+    const cpl = p.Price / 10; // tenths of cent -> cents/L
+    if (!isRealisticPrice(cpl)) continue; // skip 999.9 sentinels and similar
+
     if (!priceMap.has(p.SiteId)) priceMap.set(p.SiteId, []);
     priceMap.get(p.SiteId)!.push({
       fuel: fuelCode,
-      price: p.Price / 10, // tenths of cent -> cents/L
+      price: cpl,
       updated: p.TransactionDateUtc,
     });
   }

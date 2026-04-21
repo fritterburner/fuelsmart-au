@@ -2,6 +2,7 @@ import { XMLParser } from "fast-xml-parser";
 import { Station, StationPrice, FuelCode } from "../types";
 import { WA_FUEL_MAP } from "../fuel-codes";
 import { normaliseBrand } from "../brands";
+import { isRealisticPrice } from "../price-sanity";
 
 const BASE_URL = "https://www.fuelwatch.wa.gov.au/fuelwatch/fuelWatchRSS";
 
@@ -68,6 +69,8 @@ export async function fetchWAStations(): Promise<Station[]> {
           prices: [],
         });
       }
+
+      if (!isRealisticPrice(item.price)) continue;
 
       stationMap.get(key)!.prices.push({
         fuel: fuelCode,

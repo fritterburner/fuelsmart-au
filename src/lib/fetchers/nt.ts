@@ -1,5 +1,6 @@
 import { Station, StationPrice } from "../types";
 import { NT_FUEL_MAP, NT_BRAND_MAP } from "../fuel-codes";
+import { isRealisticPrice } from "../price-sanity";
 
 interface NTOutlet {
   FuelOutletId: number;
@@ -52,7 +53,11 @@ export async function fetchNTStations(): Promise<Station[]> {
   return data.FuelOutlet.filter((o) => o.IsActive).map((outlet) => {
     const brandCode = outlet.OutletBrandIdentifier;
     const prices: StationPrice[] = outlet.AvailableFuels
-      .filter((f) => f.isAvailable && f.Price > 0 && NT_FUEL_MAP[f.FuelCode])
+      .filter((f) =>
+        f.isAvailable &&
+        isRealisticPrice(f.Price) &&
+        NT_FUEL_MAP[f.FuelCode],
+      )
       .map((f) => ({
         fuel: NT_FUEL_MAP[f.FuelCode],
         price: f.Price, // already in cents/L
