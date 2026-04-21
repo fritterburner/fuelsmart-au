@@ -1,6 +1,7 @@
 import { XMLParser } from "fast-xml-parser";
 import { Station, StationPrice, FuelCode } from "../types";
 import { WA_FUEL_MAP } from "../fuel-codes";
+import { normaliseBrand } from "../brands";
 
 const BASE_URL = "https://www.fuelwatch.wa.gov.au/fuelwatch/fuelWatchRSS";
 
@@ -56,7 +57,7 @@ export async function fetchWAStations(): Promise<Station[]> {
         stationMap.set(key, {
           id: `wa-${key.replace(/[^a-zA-Z0-9]/g, "-").toLowerCase().substring(0, 60)}`,
           name: item["trading-name"],
-          brand: item.brand,
+          brand: normaliseBrand(item.brand),
           brandCode: item.brand.substring(0, 3).toUpperCase(),
           address: item.address,
           suburb: item.location,

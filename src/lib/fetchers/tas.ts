@@ -1,5 +1,6 @@
 import { Station, StationPrice, FuelCode } from "../types";
 import { parseLocalDateToISO } from "./tz";
+import { normaliseBrand } from "../brands";
 
 const BASE_URL = "https://api.onegov.nsw.gov.au/FuelCheckTasApp/v1/fuel";
 
@@ -90,7 +91,7 @@ export async function fetchTASStations(): Promise<Station[]> {
       return {
         id: `tas-${station.stationid}`,
         name: station.name,
-        brand: station.brand,
+        brand: normaliseBrand(station.brand),
         brandCode: station.brandid,
         address: parsed.street,
         suburb: parsed.suburb,
