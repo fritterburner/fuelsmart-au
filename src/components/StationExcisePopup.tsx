@@ -4,6 +4,8 @@ import { useState } from "react";
 import type { Station, FuelCode } from "@/lib/types";
 import type { Verdict, NearestBaselineResult, VerdictResult } from "@/lib/excise/types";
 import { EXCISE_CUT_CPL } from "@/lib/excise/baselines";
+import { formatAge } from "@/lib/time-format";
+import StationNavLinks from "./StationNavLinks";
 
 interface Props {
   station: Station;
@@ -136,11 +138,16 @@ export default function StationExcisePopup({
       )}
 
       <div className="text-xs text-gray-500 mt-2">
-        Price updated: {new Date(pumpPriceUpdated).toLocaleDateString()}
+        Price updated {formatAge(pumpPriceUpdated)}
       </div>
+      <StationNavLinks
+        lat={station.lat}
+        lng={station.lng}
+        name={station.name}
+      />
       <a
         href="/excise"
-        className="block text-xs text-blue-700 underline mt-1"
+        className="block text-xs text-blue-700 underline mt-2"
       >
         Learn how this is calculated →
       </a>

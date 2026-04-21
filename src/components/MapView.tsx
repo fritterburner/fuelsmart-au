@@ -9,7 +9,9 @@ import { calcVerdict } from "@/lib/excise/calc";
 import { toFuelBucket } from "@/lib/excise/fuel-buckets";
 import type { Verdict, MarketData } from "@/lib/excise/types";
 import { assignRankColors } from "@/lib/rank-palette";
+import { formatAge } from "@/lib/time-format";
 import StationExcisePopup from "./StationExcisePopup";
+import StationNavLinks from "./StationNavLinks";
 import "leaflet/dist/leaflet.css";
 
 // Fix Leaflet default marker icons in Next.js
@@ -302,8 +304,13 @@ export default function MapView({
                   </div>
                 ))}
                 <div className="text-xs text-gray-500 mt-1">
-                  Updated: {new Date(priceEntry.updated).toLocaleDateString()}
+                  Updated {formatAge(priceEntry.updated)}
                 </div>
+                <StationNavLinks
+                  lat={station.lat}
+                  lng={station.lng}
+                  name={station.name}
+                />
               </div>
             </Popup>
           </Marker>
