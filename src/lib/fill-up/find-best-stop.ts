@@ -11,7 +11,7 @@
 import type { Station, FuelCode } from "../types";
 import { FUEL_FALLBACKS } from "../fuel-codes";
 import { haversine } from "../trip-planner";
-import type { OsrmResult } from "./osrm";
+import { OsrmThrottledError, type OsrmResult } from "./osrm";
 
 // --- Public types ---------------------------------------------------------
 
@@ -69,6 +69,66 @@ const BBOX_MARGIN_KM = 20; // quick reject anything outside this padded box
 const MAX_CORRIDOR_CANDIDATES = 200; // protect OSRM against very long routes
 const MAX_OSRM_CANDIDATES = 15; // top-N by raw c/L before paying for via-routes
 const ON_ROUTE_DETOUR_KM = 0.5; // anything ≤ this detour is considered "on-route"
+export const OSRM_CONCURRENCY = 4; // max parallel OSRM calls — router.project-osrm.org demo bursts above this trigger 429
+export const OSRM_RETRY_BACKOFF_MS = 1500; // wait this long before retrying a 429 once
+
+// --- Concurrency + retry helpers ------------------------------------------
+
+/**
+ * Run `fn` over `inputs` with at most `concurrency` promises in flight at once.
+ * Preserves output order; individual failures bubble up and abort remaining
+ * work (matches `Promise.all` semantics).
+ */
+export async function mapWithConcurrency<I, O>(
+  inputs: I[],
+  concurrency: number,
+  fn: (input: I, index: number) => Promise<O>,
+): Promise<O[]> {
+  if (inputs.length === 0) return [];
+  const results: O[] = new Array(inputs.length);
+  let cursor = 0;
+  let rejected = false;
+  async function worker() {
+    while (!rejected) {
+      const i = cursor++;
+      if (i >= inputs.length) return;
+      results[i] = await fn(inputs[i], i);
+    }
+  }
+  const workerCount = Math.max(1, Math.min(concurrency, inputs.length));
+  try {
+    await Promise.all(Array.from({ length: workerCount }, worker));
+  } catch (e) {
+    rejected = true;
+    throw e;
+  }
+  return results;
+}
+
+/**
+ * Run an OSRM call once, and if it throws `OsrmThrottledError`, wait
+ * `OSRM_RETRY_BACKOFF_MS` and try exactly once more. Any non-throttle
+ * error bubbles up immediately.
+ */
+export async function osrmWithRetry(
+  routeFn: (coords: [number, number][]) => Promise<OsrmResult>,
+  coords: [number, number][],
+  sleep: (ms: number) => Promise<void> = defaultSleep,
+): Promise<OsrmResult> {
+  try {
+    return await routeFn(coords);
+  } catch (e) {
+    if (e instanceof OsrmThrottledError) {
+      await sleep(OSRM_RETRY_BACKOFF_MS);
+      return await routeFn(coords);
+    }
+    throw e;
+  }
+}
+
+function defaultSleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 // --- Entry point ----------------------------------------------------------
 
@@ -95,8 +155,8 @@ export async function findBestStop(
   priced.sort((x, y) => x.priceCpl - y.priceCpl);
   const topCandidates = priced.slice(0, MAX_OSRM_CANDIDATES);
 
-  // 4. Direct route.
-  const direct = await deps.osrmRoute([
+  // 4. Direct route (retry once on 429).
+  const direct = await osrmWithRetry(deps.osrmRoute, [
     [a.lat, a.lng],
     [b.lat, b.lng],
   ]);
@@ -114,10 +174,14 @@ export async function findBestStop(
     };
   }
 
-  // 5. In parallel: via-route per candidate.
-  const candidates: CandidateResult[] = await Promise.all(
-    topCandidates.map(async ({ station, priceCpl }) => {
-      const via = await deps.osrmRoute([
+  // 5. Via-route per candidate, capped at OSRM_CONCURRENCY in flight,
+  //    each call retried once on 429. Sequencing prevents self-inflicted
+  //    bursts on the public OSRM demo server.
+  const candidates: CandidateResult[] = await mapWithConcurrency(
+    topCandidates,
+    OSRM_CONCURRENCY,
+    async ({ station, priceCpl }) => {
+      const via = await osrmWithRetry(deps.osrmRoute, [
         [a.lat, a.lng],
         [station.lat, station.lng],
         [b.lat, b.lng],
@@ -137,7 +201,7 @@ export async function findBestStop(
         totalCostAud: fillCostAud + detourFuelCostAud,
         geometry: via.geometry,
       };
-    }),
+    },
   );
 
   // 6. Rank by total cost.

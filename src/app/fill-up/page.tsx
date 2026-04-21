@@ -42,6 +42,7 @@ export default function FillUpPage() {
   const [consumption, setConsumption] = useState(10.5);
 
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<FillUpDto | null>(null);
 
@@ -76,6 +77,31 @@ export default function FillUpPage() {
     setResult(null);
     setError(null);
   }
+
+  // Cycle reassurance messages while loading — routing can take 2–4s with the
+  // concurrency cap (and longer if a 429 retry fires). Gives the user a sense
+  // of "we're working on it" without faking precise progress.
+  useEffect(() => {
+    if (!loading) {
+      setLoadingStage(0);
+      return;
+    }
+    const t1 = setTimeout(() => setLoadingStage(1), 2000);
+    const t2 = setTimeout(() => setLoadingStage(2), 5000);
+    const t3 = setTimeout(() => setLoadingStage(3), 10000);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [loading]);
+
+  const loadingMessage = [
+    "Finding the best stop…",
+    "Checking nearby stations…",
+    "Still working — public routing service is a bit slow…",
+    "Almost there…",
+  ][loadingStage];
 
   async function findBest() {
     if (!a || !b) return;
@@ -207,10 +233,25 @@ export default function FillUpPage() {
             onClick={findBest}
             disabled={!a || !b || loading}
             className="ml-auto px-4 py-2 min-h-[40px] rounded-lg bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-bold transition-colors disabled:bg-slate-600 disabled:text-slate-400 disabled:cursor-not-allowed"
+            aria-describedby={loading ? "fill-up-loading-hint" : undefined}
           >
             {loading ? "Finding…" : "Find the best stop"}
           </button>
         </div>
+        {loading && (
+          <div
+            id="fill-up-loading-hint"
+            role="status"
+            aria-live="polite"
+            className="px-3 pb-2 text-xs text-emerald-300 flex items-center gap-2"
+          >
+            <span
+              aria-hidden="true"
+              className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-300 animate-pulse"
+            />
+            {loadingMessage}
+          </div>
+        )}
       </header>
 
       {/* Map */}

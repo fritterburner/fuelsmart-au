@@ -1,6 +1,13 @@
-import { findBestStop, perpDistanceKm } from "../find-best-stop";
+import {
+  findBestStop,
+  mapWithConcurrency,
+  osrmWithRetry,
+  perpDistanceKm,
+  OSRM_CONCURRENCY,
+  OSRM_RETRY_BACKOFF_MS,
+} from "../find-best-stop";
 import type { Station } from "../../types";
-import type { OsrmResult } from "../osrm";
+import { OsrmThrottledError, type OsrmResult } from "../osrm";
 import { haversine } from "../../trip-planner";
 
 // Test helpers ---------------------------------------------------------------
@@ -194,6 +201,35 @@ describe("findBestStop", () => {
     expect(deps.osrmRoute).toHaveBeenCalledTimes(16);
   });
 
+  it(`respects OSRM_CONCURRENCY (${OSRM_CONCURRENCY}) when fanning out to via-candidates`, async () => {
+    // Track in-flight parallel count. mockOsrm is instrumented to:
+    //   1. increment a counter on entry,
+    //   2. sleep a tick so other callers can pile up,
+    //   3. record the peak, decrement on exit.
+    let inFlight = 0;
+    let peak = 0;
+    const instrumented = jest.fn(async (coords: [number, number][]) => {
+      inFlight++;
+      if (inFlight > peak) peak = inFlight;
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+      return mockOsrmRoute(coords);
+    });
+
+    // 15 corridor candidates => 1 direct + 15 vias = 16 calls total.
+    const stations = Array.from({ length: 15 }, (_, i) =>
+      station(`s${i}`, -12.4, 130.88 + i * 0.007, { U91: 150 + i }),
+    );
+
+    await findBestStop(
+      { a: A, b: B, stations, fuel: "U91", fillLitres: 50, consumption: 10 },
+      { osrmRoute: instrumented },
+    );
+
+    expect(instrumented).toHaveBeenCalledTimes(16);
+    expect(peak).toBeLessThanOrEqual(OSRM_CONCURRENCY);
+  });
+
   it("computes savingsVsOnRoute when winner beats on-route cheapest", async () => {
     const sOn = station("on", -12.4, 131.0, { U91: 180.0 });
     // 3 km north ≈ 6 km detour, 10 c/L cheaper.
@@ -212,5 +248,91 @@ describe("findBestStop", () => {
     expect(r.winner?.station.id).toBe("slight");
     expect(r.onRouteCheapest?.station.id).toBe("on");
     expect(r.savingsVsOnRoute).toBeGreaterThan(0);
+  });
+});
+
+// -------------------------------------------------------------------------
+
+describe("mapWithConcurrency", () => {
+  it("returns [] for an empty input list", async () => {
+    const out = await mapWithConcurrency([], 4, async () => "x");
+    expect(out).toEqual([]);
+  });
+
+  it("preserves output order even when inputs finish out of order", async () => {
+    // Later inputs resolve faster than earlier ones — order must still be
+    // input-order, not resolution-order.
+    const delaysMs = [30, 5, 20, 10];
+    const out = await mapWithConcurrency(delaysMs, 4, async (ms) => {
+      await new Promise((r) => setTimeout(r, ms));
+      return ms;
+    });
+    expect(out).toEqual(delaysMs);
+  });
+
+  it("caps in-flight promises at `concurrency`", async () => {
+    let inFlight = 0;
+    let peak = 0;
+    const inputs = Array.from({ length: 12 }, (_, i) => i);
+    await mapWithConcurrency(inputs, 3, async () => {
+      inFlight++;
+      if (inFlight > peak) peak = inFlight;
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+    });
+    expect(peak).toBe(3);
+  });
+
+  it("propagates the first rejection", async () => {
+    const fn = jest.fn(async (i: number) => {
+      if (i === 2) throw new Error("boom");
+      return i;
+    });
+    await expect(mapWithConcurrency([0, 1, 2, 3, 4], 2, fn)).rejects.toThrow("boom");
+  });
+});
+
+describe("osrmWithRetry", () => {
+  it("returns the first result when no error is thrown", async () => {
+    const fn = jest.fn(async () => ({ distanceKm: 5, durationMin: 5, geometry: [] }));
+    const r = await osrmWithRetry(fn, [[0, 0], [1, 1]]);
+    expect(r.distanceKm).toBe(5);
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries exactly once when the first call throws OsrmThrottledError, then succeeds", async () => {
+    const fn = jest
+      .fn<Promise<OsrmResult>, [[number, number][]]>()
+      .mockRejectedValueOnce(new OsrmThrottledError())
+      .mockResolvedValueOnce({ distanceKm: 7, durationMin: 7, geometry: [] });
+    const sleep = jest.fn(async () => {});
+    const r = await osrmWithRetry(fn, [[0, 0], [1, 1]], sleep);
+    expect(r.distanceKm).toBe(7);
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(sleep).toHaveBeenCalledWith(OSRM_RETRY_BACKOFF_MS);
+  });
+
+  it("bubbles OsrmThrottledError if the retry is also throttled", async () => {
+    const fn = jest
+      .fn<Promise<OsrmResult>, [[number, number][]]>()
+      .mockRejectedValueOnce(new OsrmThrottledError())
+      .mockRejectedValueOnce(new OsrmThrottledError());
+    const sleep = jest.fn(async () => {});
+    await expect(
+      osrmWithRetry(fn, [[0, 0], [1, 1]], sleep),
+    ).rejects.toBeInstanceOf(OsrmThrottledError);
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("does NOT retry on non-throttle errors", async () => {
+    const fn = jest
+      .fn<Promise<OsrmResult>, [[number, number][]]>()
+      .mockRejectedValue(new Error("OSRM no route: NoRoute"));
+    const sleep = jest.fn(async () => {});
+    await expect(osrmWithRetry(fn, [[0, 0], [1, 1]], sleep)).rejects.toThrow(
+      "OSRM no route",
+    );
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(sleep).not.toHaveBeenCalled();
   });
 });
