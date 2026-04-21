@@ -6,6 +6,7 @@ import FuelSelect from "@/components/FuelSelect";
 import LocationSearch from "@/components/LocationSearch";
 import ExciseToggle from "@/components/ExciseToggle";
 import ExciseStatusBar from "@/components/ExciseStatusBar";
+import DiscountNudge from "@/components/DiscountNudge";
 import { FuelCode } from "@/lib/types";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { useMarketData } from "@/lib/useMarketData";
@@ -178,6 +179,9 @@ export default function Home() {
           override={override}
         />
       )}
+
+      {/* First-run discount nudge (hides itself once dismissed or discounts exist) */}
+      <DiscountNudge />
 
       {/* Map */}
       <div className="flex-1 relative">

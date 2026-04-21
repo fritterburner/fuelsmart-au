@@ -112,6 +112,32 @@ export function evaluate({
 }
 
 /**
+ * Map-popup-scoped discount application. Unlike `effectiveCpl` (which is
+ * used by the A/B comparison view with a known fill size), this helper:
+ *   • only considers `appliesTo: "both"` discounts (popups aren't sided)
+ *   • skips `fixed_rebate` discounts (they need fill-size context)
+ *   • stacks the remaining `fixed_cpl` + `percent_cashback` for the
+ *     lowest effective per-litre price
+ * Returns `effectiveCpl === pumpCpl` and `applied === []` if nothing matches.
+ */
+export function applyToStation(
+  pumpCpl: number,
+  discounts: Discount[],
+): {
+  effectiveCpl: number;
+  applied: Array<{ id: string; name: string; valueCpl: number }>;
+} {
+  const applicable = discounts.filter(
+    (d) =>
+      d.enabled &&
+      d.appliesTo === "both" &&
+      (d.type === "fixed_cpl" || d.type === "percent_cashback"),
+  );
+  const { cpl, applied } = effectiveCpl(pumpCpl, 0, applicable, "A");
+  return { effectiveCpl: cpl, applied };
+}
+
+/**
  * Detour breakeven: how many extra km is worth driving to save X c/L?
  * saving_per_fill = fillLitres * savingCpl / 100   (dollars)
  * detour_cost_per_km = consumption/100 * pricePerLitre/100  (dollars per km)

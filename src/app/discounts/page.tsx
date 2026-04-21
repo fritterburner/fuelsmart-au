@@ -8,63 +8,10 @@ import {
   evaluate,
   breakevenDetourKm,
 } from "@/lib/discounts";
-
-const STORAGE_KEY = "fuelsmart-discounts";
-
-const SEED_DISCOUNTS: Discount[] = [
-  {
-    id: "seed-coles-docket",
-    name: "Coles shopper docket (4c/L)",
-    type: "fixed_cpl",
-    value: 4,
-    appliesTo: "both",
-    enabled: false,
-  },
-  {
-    id: "seed-racq",
-    name: "RACQ / NRMA member (4c/L)",
-    type: "fixed_cpl",
-    value: 4,
-    appliesTo: "both",
-    enabled: false,
-  },
-  {
-    id: "seed-amex",
-    name: "Amex/card cashback (2%)",
-    type: "percent_cashback",
-    value: 2,
-    appliesTo: "both",
-    enabled: false,
-  },
-  {
-    id: "seed-7e",
-    name: "7-Eleven Fuel Price Lock (app)",
-    type: "fixed_cpl",
-    value: 0,
-    appliesTo: "both",
-    enabled: false,
-  },
-];
+import { loadDiscounts, saveDiscounts } from "@/lib/useDiscounts";
 
 function newId() {
   return "d-" + Math.random().toString(36).slice(2, 9);
-}
-
-function loadDiscounts(): Discount[] {
-  if (typeof window === "undefined") return SEED_DISCOUNTS;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return SEED_DISCOUNTS;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return SEED_DISCOUNTS;
-    return parsed;
-  } catch {
-    return SEED_DISCOUNTS;
-  }
-}
-
-function saveDiscounts(list: Discount[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 }
 
 export default function DiscountsPage() {

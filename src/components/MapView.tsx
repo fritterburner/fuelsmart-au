@@ -11,6 +11,8 @@ import type { Verdict, MarketData } from "@/lib/excise/types";
 import { assignRankColors } from "@/lib/rank-palette";
 import { formatAge } from "@/lib/time-format";
 import { isInNorthernTerritory } from "@/lib/nt-bounds";
+import { applyToStation } from "@/lib/discounts";
+import { useDiscounts } from "@/lib/useDiscounts";
 import StationExcisePopup from "./StationExcisePopup";
 import StationNavLinks from "./StationNavLinks";
 import "leaflet/dist/leaflet.css";
@@ -180,6 +182,7 @@ export default function MapView({
   const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const fetchController = useRef<AbortController | null>(null);
+  const { discounts: activeDiscounts } = useDiscounts();
 
   const showNtOutage = !!mapCenter && isInNorthernTerritory(mapCenter.lat, mapCenter.lng);
 
@@ -309,14 +312,39 @@ export default function MapView({
                 <br />
                 {station.address}, {station.suburb} {station.state} {station.postcode}
                 <hr className="my-1" />
-                {station.prices.map((p) => (
-                  <div key={p.fuel} className="flex justify-between gap-4">
-                    <span>{p.fuel}</span>
-                    <strong>{p.price.toFixed(1)} c/L</strong>
-                  </div>
-                ))}
+                {station.prices.map((p) => {
+                  const eff = applyToStation(p.price, activeDiscounts);
+                  const hasDiscount = eff.applied.length > 0;
+                  return (
+                    <div
+                      key={p.fuel}
+                      className="flex justify-between items-start gap-4"
+                    >
+                      <span>{p.fuel}</span>
+                      <span className="text-right">
+                        <strong>{eff.effectiveCpl.toFixed(1)} c/L</strong>
+                        {hasDiscount && (
+                          <span
+                            className="block text-[11px] text-gray-500 line-through"
+                            aria-label={`Rack price ${p.price.toFixed(1)} cents per litre`}
+                          >
+                            {p.price.toFixed(1)}
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  );
+                })}
                 <div className="text-xs text-gray-500 mt-1">
                   Updated {formatAge(priceEntry.updated)}
+                  {activeDiscounts.some((d) => d.enabled) && (
+                    <span className="block text-[11px] text-emerald-700">
+                      Showing price after your saved discounts.{" "}
+                      <a href="/discounts" className="underline">
+                        Change
+                      </a>
+                    </span>
+                  )}
                 </div>
                 <StationNavLinks
                   lat={station.lat}
