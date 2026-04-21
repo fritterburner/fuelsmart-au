@@ -109,6 +109,12 @@ export default function Home() {
             {menuOpen && (
               <div className="absolute right-0 top-full mt-1 w-60 bg-slate-700 rounded-lg shadow-lg overflow-hidden z-[1100]">
                 <a
+                  href="/fill-up"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                >
+                  <span aria-hidden="true">📍</span> Where should I fill up?
+                </a>
+                <a
                   href="/trip"
                   className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors md:hidden"
                 >
