@@ -47,8 +47,15 @@ export default function Home() {
         setMenuOpen(false);
       }
     }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === "Escape") setMenuOpen(false);
+    }
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
+    };
   }, [menuOpen]);
 
   return (
@@ -108,20 +115,26 @@ export default function Home() {
               <span className="text-xl leading-none">&#8942;</span>
             </button>
             {menuOpen && (
-              <div className="absolute right-0 top-full mt-1 w-60 bg-slate-700 rounded-lg shadow-lg overflow-hidden z-[1100]">
+              <div
+                role="menu"
+                aria-label="Main menu"
+                className="absolute right-0 top-full mt-1 w-60 bg-slate-700 rounded-lg shadow-lg overflow-hidden z-[1100]"
+              >
                 <a
+                  role="menuitem"
                   href="/fill-up"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600"
                 >
                   <span aria-hidden="true">📍</span> Where should I fill up?
                 </a>
                 <a
+                  role="menuitem"
                   href="/trip"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors md:hidden"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600 md:hidden"
                 >
                   <span aria-hidden="true">🚗</span> Trip Planner
                 </a>
-                <div className="md:hidden">
+                <div className="md:hidden" role="none">
                   <ExciseToggle
                     mode={exciseMode}
                     onToggle={handleToggleExcise}
@@ -129,32 +142,37 @@ export default function Home() {
                   />
                 </div>
                 <a
+                  role="menuitem"
                   href="/compare"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600"
                 >
                   <span aria-hidden="true">🚙</span> Which car should I drive?
                 </a>
                 <a
+                  role="menuitem"
                   href="/discounts"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600"
                 >
                   <span aria-hidden="true">💳</span> Cashback vs detour
                 </a>
                 <a
+                  role="menuitem"
                   href="/additives"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600"
                 >
                   <span aria-hidden="true">🧪</span> Fuel additives: worth it?
                 </a>
                 <a
+                  role="menuitem"
                   href="/excise"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors border-t border-slate-600"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600 border-t border-slate-600"
                 >
                   <span aria-hidden="true">📘</span> How excise is calculated
                 </a>
                 <a
+                  role="menuitem"
                   href="/settings"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors border-t border-slate-600"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600 border-t border-slate-600"
                 >
                   <span aria-hidden="true">⚙️</span> Settings
                 </a>
