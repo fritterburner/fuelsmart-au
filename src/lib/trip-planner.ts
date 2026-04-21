@@ -547,7 +547,7 @@ export function planTripComparison(params: TripParams): TripComparison {
   } else if (totalDistance > 100) {
     coverageWarnings.push(
       `No fuel stations found along this ${Math.round(totalDistance)} km route. ` +
-      `The route may pass entirely through states we don't have data for (SA, VIC, TAS, NSW).`
+      `The route may pass entirely through states we don't have data for (SA, VIC, TAS).`
     );
   }
 

@@ -214,7 +214,9 @@ export default function Home() {
           </a>
           , FuelCheck TAS
         </span>
-        <span>Prices updated daily</span>
+        <a href="/data-freshness" className="underline opacity-80">
+          Data freshness varies by state →
+        </a>
       </footer>
     </div>
   );

@@ -23,13 +23,18 @@ export default function ExciseToggle({ mode, onToggle, variant }: Props) {
         }
         title={
           mode
-            ? "Excise mode is ON — pins coloured by pass-through verdict"
-            : "Enable excise mode to see federal-excise pass-through verdicts"
+            ? "Pre-rebate view ON — pins show whether each station is passing on the April 2026 excise halving"
+            : "Check whether stations are passing on the April 2026 excise halving (52.6¢ → 26.3¢)"
         }
         aria-pressed={mode}
+        aria-label={
+          mode
+            ? "Pre-rebate view on — click to turn off"
+            : "Turn on excise-cut pass-through checker"
+        }
       >
         <span aria-hidden="true">⛽</span>
-        <span>Excise: {mode ? "on" : "off"}</span>
+        <span>{mode ? "Pre-rebate view: on" : "Excise checker"}</span>
       </button>
     );
   }
@@ -41,12 +46,18 @@ export default function ExciseToggle({ mode, onToggle, variant }: Props) {
       className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
       aria-pressed={mode}
     >
-      <span className="flex items-center gap-2">
-        <span aria-hidden="true">⛽</span> Excise mode
+      <span className="flex items-center gap-2 min-w-0">
+        <span aria-hidden="true">⛽</span>
+        <span className="flex flex-col items-start min-w-0">
+          <span>Excise checker</span>
+          <span className="text-[10px] text-gray-400 font-normal leading-tight">
+            Apr–Jun 2026: excise halved to 26.3¢/L
+          </span>
+        </span>
       </span>
       <span
         className={
-          "inline-flex items-center justify-center min-w-[36px] px-2 py-0.5 rounded text-xs font-semibold " +
+          "inline-flex items-center justify-center min-w-[36px] px-2 py-0.5 rounded text-xs font-semibold flex-shrink-0 " +
           (mode ? "bg-emerald-500 text-white" : "bg-slate-500 text-gray-100")
         }
       >
