@@ -10,6 +10,20 @@
 
 export const OSRM_BASE = "https://router.project-osrm.org";
 
+/**
+ * Thrown when OSRM returns 429. The public demo server is heavily
+ * rate-limited and has no SLA — see https://github.com/Project-OSRM/osrm-backend/wiki/Demo-server.
+ * API routes should return 429 with an actionable message when they catch this.
+ */
+export class OsrmThrottledError extends Error {
+  constructor() {
+    super(
+      "The public routing service is temporarily throttling us — try again in a minute or two.",
+    );
+    this.name = "OsrmThrottledError";
+  }
+}
+
 export interface OsrmResult {
   distanceKm: number;
   durationMin: number;
@@ -35,6 +49,9 @@ export async function osrmRoute(
 
   const resp = await fetch(url);
   if (!resp.ok) {
+    if (resp.status === 429) {
+      throw new OsrmThrottledError();
+    }
     throw new Error(`OSRM HTTP ${resp.status}`);
   }
   const data = await resp.json();

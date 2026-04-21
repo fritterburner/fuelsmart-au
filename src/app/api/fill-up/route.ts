@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCachedStations } from "@/lib/cache";
 import { findBestStop } from "@/lib/fill-up/find-best-stop";
-import { osrmRoute } from "@/lib/fill-up/osrm";
+import { osrmRoute, OsrmThrottledError } from "@/lib/fill-up/osrm";
 import { haversine } from "@/lib/trip-planner";
 import type { FuelCode } from "@/lib/types";
 
@@ -66,6 +66,9 @@ export async function POST(request: NextRequest) {
     );
     return NextResponse.json(result);
   } catch (e) {
+    if (e instanceof OsrmThrottledError) {
+      return NextResponse.json({ error: e.message, retryable: true }, { status: 429 });
+    }
     return NextResponse.json(
       { error: `Routing failed: ${(e as Error).message}` },
       { status: 503 },

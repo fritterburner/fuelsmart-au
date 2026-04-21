@@ -52,6 +52,22 @@ export async function GET(request: NextRequest) {
 
   const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${waypoints.join(";")}?overview=full&geometries=geojson`;
   const routeResp = await fetch(osrmUrl);
+  if (routeResp.status === 429) {
+    return NextResponse.json(
+      {
+        error:
+          "The public routing service is temporarily throttling us — try again in a minute or two.",
+        retryable: true,
+      },
+      { status: 429 },
+    );
+  }
+  if (!routeResp.ok) {
+    return NextResponse.json(
+      { error: `Routing service returned HTTP ${routeResp.status}` },
+      { status: 503 },
+    );
+  }
   const routeData = await routeResp.json();
 
   if (routeData.code !== "Ok" || !routeData.routes?.[0]) {
