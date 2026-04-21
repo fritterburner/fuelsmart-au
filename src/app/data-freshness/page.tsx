@@ -43,9 +43,9 @@ const STATES: StateEntry[] = [
     code: "NT",
     label: "Northern Territory",
     source: "MyFuel NT",
-    cadence: "Varies",
+    cadence: "Temporarily unavailable",
     detail:
-      "Retailers self-report through the MyFuel NT portal. Cadence depends on the retailer; most update within a few hours of a change.",
+      "The NT Government is rebuilding the MyFuel NT website. While that's underway the feed we scrape is replaced by an upgrade notice, so no NT prices can be published here. Post-relaunch NT is moving to a 24-hour price-lock model (similar to WA FuelWatch); we'll rewire the fetcher once the new site is live.",
   },
   {
     code: "TAS",

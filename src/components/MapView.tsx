@@ -10,6 +10,7 @@ import { toFuelBucket } from "@/lib/excise/fuel-buckets";
 import type { Verdict, MarketData } from "@/lib/excise/types";
 import { assignRankColors } from "@/lib/rank-palette";
 import { formatAge } from "@/lib/time-format";
+import { isInNorthernTerritory } from "@/lib/nt-bounds";
 import StationExcisePopup from "./StationExcisePopup";
 import StationNavLinks from "./StationNavLinks";
 import "leaflet/dist/leaflet.css";
@@ -78,9 +79,11 @@ function loadMapPosition(): { lat: number; lng: number; zoom: number } | null {
 
 function MapController({
   onBoundsChange,
+  onCenterChange,
   fuel,
 }: {
   onBoundsChange: (bounds: string) => void;
+  onCenterChange: (lat: number, lng: number) => void;
   fuel: FuelCode;
 }) {
   const map = useMap();
@@ -92,6 +95,8 @@ function MapController({
     moveend: () => {
       saveMapPosition(map);
       onBoundsChange(getBoundsString(map));
+      const c = map.getCenter();
+      onCenterChange(c.lat, c.lng);
     },
   });
 
@@ -173,7 +178,10 @@ export default function MapView({
   const [loading, setLoading] = useState(false);
   const [activeFuel, setActiveFuel] = useState<FuelCode>(fuel);
   const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const fetchController = useRef<AbortController | null>(null);
+
+  const showNtOutage = !!mapCenter && isInNorthernTerritory(mapCenter.lat, mapCenter.lng);
 
   const fetchStations = useCallback(
     async (bounds: string) => {
@@ -226,7 +234,11 @@ export default function MapView({
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
-      <MapController onBoundsChange={fetchStations} fuel={fuel} />
+      <MapController
+        onBoundsChange={fetchStations}
+        onCenterChange={(lat, lng) => setMapCenter({ lat, lng })}
+        fuel={fuel}
+      />
       <FlyTo center={flyTo} />
       {stations.map((station) => {
         const priceEntry = station.prices.find((p) => p.fuel === displayFuel);
@@ -316,17 +328,40 @@ export default function MapView({
           </Marker>
         );
       })}
-      {/* Fallback fuel notice banner */}
-      {fallbackNotice && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] bg-amber-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium max-w-md text-center">
-          {fallbackNotice}
-        </div>
-      )}
-      {loading && !fallbackNotice && (
-        <div className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] bg-white px-3 py-1 rounded shadow text-sm">
-          Loading...
-        </div>
-      )}
+      {/* Top-stacked notices: NT outage, fuel fallback, loading */}
+      <div
+        className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] flex flex-col gap-2 items-center w-[calc(100%-1rem)] max-w-md"
+        aria-live="polite"
+      >
+        {showNtOutage && (
+          <div
+            role="status"
+            className="bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg text-sm text-center"
+          >
+            <strong>NT data temporarily unavailable.</strong>
+            <div className="text-xs opacity-90 mt-0.5">
+              MyFuel NT is being rebuilt by the NT Government.{" "}
+              <a href="/data-freshness" className="underline font-semibold">
+                Why
+              </a>
+            </div>
+          </div>
+        )}
+        {fallbackNotice && (
+          <div
+            role="status"
+            className="bg-amber-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium text-center"
+          >
+            {fallbackNotice}
+          </div>
+        )}
+        {loading && !fallbackNotice && !showNtOutage && (
+          <div className="bg-white px-3 py-1 rounded shadow text-sm">
+            Loading...
+          </div>
+        )}
+      </div>
+      {/* End top-stacked notices */}
     </MapContainer>
   );
 }
