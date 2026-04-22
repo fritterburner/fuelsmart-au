@@ -27,6 +27,13 @@ export interface Discount {
    * AU state codes this discount applies in. Empty = applies in any state.
    */
   states: StateCode[];
+  /**
+   * Station IDs this discount applies to. When set and non-empty, the discount
+   * matches only those specific stations and the `brands`/`states` filters are
+   * ignored. Use for independent-servo overrides ("mate's rates at Ray's in
+   * Howard Springs") that don't fit brand/state rules.
+   */
+  stationIds?: string[];
 }
 
 export interface StationQuote {
@@ -136,7 +143,7 @@ export function evaluate({
  * Returns `effectiveCpl === pumpCpl` and `applied === []` if nothing matches.
  */
 export function applyToStation(
-  station: Pick<Station, "brand" | "state">,
+  station: Pick<Station, "id" | "brand" | "state">,
   pumpCpl: number,
   discounts: Discount[],
 ): {
@@ -146,6 +153,10 @@ export function applyToStation(
   const applicable = discounts.filter((d) => {
     if (!d.enabled) return false;
     if (d.type !== "fixed_cpl" && d.type !== "percent_cashback") return false;
+    // Station-specific overrides take precedence and ignore brand/state filters.
+    if (d.stationIds && d.stationIds.length > 0) {
+      return d.stationIds.includes(station.id);
+    }
     if (d.brands.length > 0 && !d.brands.includes(station.brand)) return false;
     if (d.states.length > 0 && !d.states.includes(station.state)) return false;
     return true;

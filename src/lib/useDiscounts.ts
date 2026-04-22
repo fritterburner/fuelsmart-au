@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import type { Discount } from "./discounts";
 
 export const DISCOUNTS_STORAGE_KEY = "fuelsmart-discounts";
+/**
+ * Custom event fired after `saveDiscounts` so same-tab consumers of `useDiscounts`
+ * re-read the list. The native `storage` event only fires across tabs.
+ */
+export const DISCOUNTS_CHANGED_EVENT = "fuelsmart:discounts-changed";
 
 export const SEED_DISCOUNTS: Discount[] = [
   {
@@ -119,6 +124,7 @@ function migrate(parsed: unknown): Discount[] {
       enabled: d.enabled ?? false,
       brands: Array.isArray(d.brands) ? d.brands : [],
       states: Array.isArray(d.states) ? d.states : [],
+      stationIds: Array.isArray(d.stationIds) ? d.stationIds : undefined,
     };
   });
 }
@@ -137,6 +143,7 @@ export function loadDiscounts(): Discount[] {
 export function saveDiscounts(list: Discount[]) {
   if (typeof window === "undefined") return;
   localStorage.setItem(DISCOUNTS_STORAGE_KEY, JSON.stringify(list));
+  window.dispatchEvent(new CustomEvent(DISCOUNTS_CHANGED_EVENT));
 }
 
 /**
@@ -157,8 +164,15 @@ export function useDiscounts(): { discounts: Discount[]; hydrated: boolean } {
     function onStorage(e: StorageEvent) {
       if (e.key === DISCOUNTS_STORAGE_KEY) setDiscounts(loadDiscounts());
     }
+    function onSameTabChange() {
+      setDiscounts(loadDiscounts());
+    }
     window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    window.addEventListener(DISCOUNTS_CHANGED_EVENT, onSameTabChange);
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(DISCOUNTS_CHANGED_EVENT, onSameTabChange);
+    };
   }, []);
 
   return { discounts, hydrated };

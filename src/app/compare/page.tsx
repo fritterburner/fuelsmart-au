@@ -82,7 +82,7 @@ export default function ComparePage() {
             />
           </svg>
         </a>
-        <h1 className="font-bold text-lg">Which car should I drive?</h1>
+        <h1 className="font-bold text-lg">Compare running costs</h1>
       </div>
 
       <div className="max-w-3xl mx-auto p-4 md:p-6 space-y-5">

@@ -12,7 +12,8 @@ import { assignRankColors } from "@/lib/rank-palette";
 import { formatAge } from "@/lib/time-format";
 import { isInNorthernTerritory } from "@/lib/nt-bounds";
 import { applyToStation } from "@/lib/discounts";
-import { useDiscounts } from "@/lib/useDiscounts";
+import type { Discount } from "@/lib/discounts";
+import { useDiscounts, loadDiscounts, saveDiscounts } from "@/lib/useDiscounts";
 import StationExcisePopup from "./StationExcisePopup";
 import StationNavLinks from "./StationNavLinks";
 import "leaflet/dist/leaflet.css";
@@ -168,6 +169,161 @@ interface Props {
   cheapestHighlightCount?: number;
 }
 
+function StationPricePopupContent({
+  station,
+  priceEntry,
+  activeDiscounts,
+}: {
+  station: Station;
+  priceEntry: { fuel: FuelCode; price: number; updated: string };
+  activeDiscounts: Discount[];
+}) {
+  const [editing, setEditing] = useState(false);
+  const [cplOff, setCplOff] = useState<string>("4");
+  const [label, setLabel] = useState<string>("");
+
+  const existingOverride = activeDiscounts.find(
+    (d) => d.stationIds && d.stationIds.includes(station.id),
+  );
+
+  function handleSave(e: React.FormEvent) {
+    e.preventDefault();
+    const value = Number(cplOff);
+    if (!Number.isFinite(value) || value <= 0) return;
+    const current = loadDiscounts();
+    const trimmedLabel = label.trim();
+    const next: Discount = {
+      id: "d-" + Math.random().toString(36).slice(2, 9),
+      name: trimmedLabel ? `${station.name} — ${trimmedLabel}` : `${station.name} — override`,
+      type: "fixed_cpl",
+      value,
+      appliesTo: "both",
+      enabled: true,
+      brands: [],
+      states: [],
+      stationIds: [station.id],
+    };
+    saveDiscounts([...current, next]);
+    setEditing(false);
+    setLabel("");
+  }
+
+  function handleRemove() {
+    if (!existingOverride) return;
+    if (!window.confirm("Remove the saved override for this station?")) return;
+    const current = loadDiscounts();
+    saveDiscounts(current.filter((d) => d.id !== existingOverride.id));
+  }
+
+  return (
+    <div className="text-sm">
+      <strong>{station.name}</strong>
+      <br />
+      {station.address}, {station.suburb} {station.state} {station.postcode}
+      <hr className="my-1" />
+      {station.prices.map((p) => {
+        const eff = applyToStation(station, p.price, activeDiscounts);
+        const hasDiscount = eff.applied.length > 0;
+        return (
+          <div key={p.fuel} className="flex justify-between items-start gap-4">
+            <span>{p.fuel}</span>
+            <span className="text-right">
+              <strong>{eff.effectiveCpl.toFixed(1)} c/L</strong>
+              {hasDiscount && (
+                <span
+                  className="block text-[11px] text-gray-500 line-through"
+                  aria-label={`Rack price ${p.price.toFixed(1)} cents per litre`}
+                >
+                  {p.price.toFixed(1)}
+                </span>
+              )}
+            </span>
+          </div>
+        );
+      })}
+      <div className="text-xs text-gray-500 mt-1">
+        Updated {formatAge(priceEntry.updated)}
+        {activeDiscounts.some((d) => d.enabled) && (
+          <span className="block text-[11px] text-emerald-700">
+            Showing price after your saved discounts.{" "}
+            <a href="/discounts" className="underline">
+              Change
+            </a>
+          </span>
+        )}
+      </div>
+
+      {/* Station-specific override controls */}
+      <div className="mt-2 pt-2 border-t border-gray-200">
+        {existingOverride ? (
+          <div className="flex items-center justify-between gap-2 text-[11px]">
+            <span className="text-emerald-700">
+              Override: {existingOverride.value} c/L off
+            </span>
+            <button
+              type="button"
+              onClick={handleRemove}
+              className="text-red-600 underline"
+            >
+              Remove
+            </button>
+          </div>
+        ) : editing ? (
+          <form onSubmit={handleSave} className="space-y-1">
+            <label className="block text-[11px] text-gray-700">
+              c/L off at this servo
+              <input
+                type="number"
+                min={0}
+                step={0.1}
+                value={cplOff}
+                onChange={(e) => setCplOff(e.target.value)}
+                className="block w-20 mt-0.5 px-1.5 py-1 border border-gray-300 rounded font-mono"
+                autoFocus
+              />
+            </label>
+            <label className="block text-[11px] text-gray-700">
+              Label (optional)
+              <input
+                type="text"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                placeholder="mate's rates"
+                className="block w-full mt-0.5 px-1.5 py-1 border border-gray-300 rounded"
+              />
+            </label>
+            <div className="flex gap-2 pt-0.5">
+              <button
+                type="submit"
+                className="px-2 py-1 text-[11px] bg-emerald-600 text-white rounded hover:bg-emerald-700"
+              >
+                Save
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditing(false)}
+                className="px-2 py-1 text-[11px] text-gray-600 hover:bg-gray-100 rounded"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="text-[11px] text-emerald-700 underline"
+          >
+            + Adjust this station&apos;s price
+          </button>
+        )}
+      </div>
+
+      <StationNavLinks lat={station.lat} lng={station.lng} name={station.name} />
+    </div>
+  );
+}
+
 export default function MapView({
   fuel,
   flyTo,
@@ -307,51 +463,11 @@ export default function MapView({
         return (
           <Marker key={station.id} position={[station.lat, station.lng]} icon={icon}>
             <Popup>
-              <div className="text-sm">
-                <strong>{station.name}</strong>
-                <br />
-                {station.address}, {station.suburb} {station.state} {station.postcode}
-                <hr className="my-1" />
-                {station.prices.map((p) => {
-                  const eff = applyToStation(station, p.price, activeDiscounts);
-                  const hasDiscount = eff.applied.length > 0;
-                  return (
-                    <div
-                      key={p.fuel}
-                      className="flex justify-between items-start gap-4"
-                    >
-                      <span>{p.fuel}</span>
-                      <span className="text-right">
-                        <strong>{eff.effectiveCpl.toFixed(1)} c/L</strong>
-                        {hasDiscount && (
-                          <span
-                            className="block text-[11px] text-gray-500 line-through"
-                            aria-label={`Rack price ${p.price.toFixed(1)} cents per litre`}
-                          >
-                            {p.price.toFixed(1)}
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  );
-                })}
-                <div className="text-xs text-gray-500 mt-1">
-                  Updated {formatAge(priceEntry.updated)}
-                  {activeDiscounts.some((d) => d.enabled) && (
-                    <span className="block text-[11px] text-emerald-700">
-                      Showing price after your saved discounts.{" "}
-                      <a href="/discounts" className="underline">
-                        Change
-                      </a>
-                    </span>
-                  )}
-                </div>
-                <StationNavLinks
-                  lat={station.lat}
-                  lng={station.lng}
-                  name={station.name}
-                />
-              </div>
+              <StationPricePopupContent
+                station={station}
+                priceEntry={priceEntry}
+                activeDiscounts={activeDiscounts}
+              />
             </Popup>
           </Marker>
         );

@@ -205,22 +205,31 @@ export default function DiscountsPage() {
                   className="w-full flex items-center justify-between gap-3 px-3 py-2 border-t border-gray-100 text-left hover:bg-gray-50 transition-colors"
                 >
                   <div className="text-xs text-gray-600 flex flex-wrap gap-x-4 gap-y-1">
-                    <span>
-                      <strong className="text-gray-700">Brands:</strong>{" "}
-                      {describeBrands(d.brands)}
-                    </span>
-                    <span>
-                      <strong className="text-gray-700">States:</strong>{" "}
-                      {describeStates(d.states)}
-                    </span>
+                    {d.stationIds && d.stationIds.length > 0 ? (
+                      <span>
+                        <strong className="text-gray-700">Station-specific override</strong>{" "}
+                        ({d.stationIds.length === 1 ? "1 station" : `${d.stationIds.length} stations`})
+                      </span>
+                    ) : (
+                      <>
+                        <span>
+                          <strong className="text-gray-700">Brands:</strong>{" "}
+                          {describeBrands(d.brands)}
+                        </span>
+                        <span>
+                          <strong className="text-gray-700">States:</strong>{" "}
+                          {describeStates(d.states)}
+                        </span>
+                      </>
+                    )}
                   </div>
                   <span aria-hidden="true" className="text-gray-400 text-sm">
                     {isExpanded ? "▴" : "▾"}
                   </span>
                 </button>
 
-                {/* Expanded filters */}
-                {isExpanded && (
+                {/* Expanded filters — hidden for station-specific overrides (brand/state don't apply) */}
+                {isExpanded && !(d.stationIds && d.stationIds.length > 0) && (
                   <div
                     id={`filters-${d.id}`}
                     className="border-t border-gray-100 p-3 space-y-4"

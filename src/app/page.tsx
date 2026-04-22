@@ -78,12 +78,7 @@ export default function Home() {
           {/* Spacer pushes action buttons right */}
           <div className="flex-1 md:flex-none" />
 
-          {/* Desktop: inline text buttons */}
-          <ExciseToggle
-            mode={exciseMode}
-            onToggle={handleToggleExcise}
-            variant="desktop"
-          />
+          {/* Excise checker lives in the three-dot menu — no header pill on desktop. */}
 
           {exciseMode && (
             <a
@@ -134,7 +129,9 @@ export default function Home() {
                 >
                   <span aria-hidden="true">🚗</span> Trip Planner
                 </a>
-                <div className="md:hidden" role="none">
+
+                {/* — Excise section — */}
+                <div className="border-t border-slate-600" role="none">
                   <ExciseToggle
                     mode={exciseMode}
                     onToggle={handleToggleExcise}
@@ -143,17 +140,19 @@ export default function Home() {
                 </div>
                 <a
                   role="menuitem"
-                  href="/compare"
+                  href="/excise"
                   className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600"
                 >
-                  <span aria-hidden="true">🚙</span> Which car should I drive?
+                  <span aria-hidden="true">📘</span> How excise is calculated
                 </a>
+
+                {/* — Analysis tools — */}
                 <a
                   role="menuitem"
-                  href="/discounts"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600"
+                  href="/compare"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600 border-t border-slate-600"
                 >
-                  <span aria-hidden="true">💳</span> Discounts &amp; loyalty
+                  <span aria-hidden="true">🚙</span> Compare running costs
                 </a>
                 <a
                   role="menuitem"
@@ -162,17 +161,19 @@ export default function Home() {
                 >
                   <span aria-hidden="true">🧪</span> Fuel additives: worth it?
                 </a>
+
+                {/* — Account — */}
                 <a
                   role="menuitem"
-                  href="/excise"
+                  href="/discounts"
                   className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600 border-t border-slate-600"
                 >
-                  <span aria-hidden="true">📘</span> How excise is calculated
+                  <span aria-hidden="true">💳</span> Discounts &amp; loyalty
                 </a>
                 <a
                   role="menuitem"
                   href="/settings"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600 border-t border-slate-600"
+                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600"
                 >
                   <span aria-hidden="true">⚙️</span> Settings
                 </a>
