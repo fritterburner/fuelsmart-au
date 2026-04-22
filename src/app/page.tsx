@@ -153,7 +153,7 @@ export default function Home() {
                   href="/discounts"
                   className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600"
                 >
-                  <span aria-hidden="true">💳</span> Cashback vs detour
+                  <span aria-hidden="true">💳</span> Discounts &amp; loyalty
                 </a>
                 <a
                   role="menuitem"
