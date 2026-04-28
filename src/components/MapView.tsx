@@ -10,7 +10,6 @@ import { toFuelBucket } from "@/lib/excise/fuel-buckets";
 import type { Verdict, MarketData } from "@/lib/excise/types";
 import { assignRankColors } from "@/lib/rank-palette";
 import { formatAge } from "@/lib/time-format";
-import { isInNorthernTerritory } from "@/lib/nt-bounds";
 import { applyToStation } from "@/lib/discounts";
 import type { Discount } from "@/lib/discounts";
 import { useDiscounts, loadDiscounts, saveDiscounts } from "@/lib/useDiscounts";
@@ -340,8 +339,6 @@ export default function MapView({
   const fetchController = useRef<AbortController | null>(null);
   const { discounts: activeDiscounts } = useDiscounts();
 
-  const showNtOutage = !!mapCenter && isInNorthernTerritory(mapCenter.lat, mapCenter.lng);
-
   const fetchStations = useCallback(
     async (bounds: string) => {
       // Cancel any in-flight request
@@ -472,25 +469,11 @@ export default function MapView({
           </Marker>
         );
       })}
-      {/* Top-stacked notices: NT outage, fuel fallback, loading */}
+      {/* Top-stacked notices: fuel fallback, loading */}
       <div
         className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] flex flex-col gap-2 items-center w-[calc(100%-1rem)] max-w-md"
         aria-live="polite"
       >
-        {showNtOutage && (
-          <div
-            role="status"
-            className="bg-blue-700 text-white px-4 py-2 rounded-lg shadow-lg text-sm text-center"
-          >
-            <strong>NT data temporarily unavailable.</strong>
-            <div className="text-xs opacity-90 mt-0.5">
-              MyFuel NT is being rebuilt by the NT Government.{" "}
-              <a href="/data-freshness" className="underline font-semibold">
-                Why
-              </a>
-            </div>
-          </div>
-        )}
         {fallbackNotice && (
           <div
             role="status"
@@ -499,7 +482,7 @@ export default function MapView({
             {fallbackNotice}
           </div>
         )}
-        {loading && !fallbackNotice && !showNtOutage && (
+        {loading && !fallbackNotice && (
           <div className="bg-white px-3 py-1 rounded shadow text-sm">
             Loading...
           </div>
