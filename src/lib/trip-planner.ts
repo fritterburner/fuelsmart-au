@@ -1,5 +1,6 @@
 import { Station, FuelCode, TripStop, TripPlan, TripComparison, StrategyResult } from "./types";
 import { FUEL_FALLBACKS } from "./fuel-codes";
+import { applyToStation, type Discount } from "./discounts";
 
 interface TripParams {
   fuel: FuelCode;
@@ -13,6 +14,8 @@ interface TripParams {
   allowFallback?: boolean; // use LAF/OPAL when primary fuel unavailable
   arriveFull?: boolean; // fill to brim at cheapest stops (arrive with max fuel)
   reservePct?: number; // 0-30, hard minimum fuel % at any stop (default 10)
+  /** User's saved discounts. Empty/omitted = rank by pump price as before. */
+  discounts?: Discount[];
 }
 
 // Haversine distance in km
@@ -137,7 +140,10 @@ function distanceAlongRoute(
 interface RouteStation {
   station: Station;
   along: number;
+  /** Effective cents/L the user pays here (post-discount). Used for ranking. */
   price: number;
+  /** Pump-board cents/L before discount. Equals price when no discount applied. */
+  pumpPrice: number;
   fallbackFuel?: FuelCode; // set when using a fallback fuel type
 }
 
@@ -146,7 +152,8 @@ function prepareRouteStations(
   fuel: FuelCode,
   routeGeometry: [number, number][],
   totalDistance: number,
-  allowFallback?: boolean
+  allowFallback?: boolean,
+  discounts: Discount[] = []
 ): { all: RouteStation[]; deduped: RouteStation[] } {
   // Reset cumulative distance cache for this route
   _cachedGeometry = null;
@@ -166,9 +173,19 @@ function prepareRouteStations(
       }
     }
     if (!priceEntry) continue;
+    // Rank by effective price so a brand-loyalty discount actually steers
+    // the planner to the right station — otherwise we'd send the user past
+    // their cheapest option to a nominally-cheaper stranger.
+    const eff = applyToStation(s, priceEntry.price, discounts);
     const positions = distanceAlongRoute(s, routeGeometry, totalDistance);
     for (const pos of positions) {
-      routeStations.push({ station: s, along: pos.along, price: priceEntry.price, fallbackFuel: usedFallback });
+      routeStations.push({
+        station: s,
+        along: pos.along,
+        price: eff.effectiveCpl,
+        pumpPrice: priceEntry.price,
+        fallbackFuel: usedFallback,
+      });
     }
   }
   routeStations.sort((a, b) => a.along - b.along);
@@ -516,7 +533,7 @@ export function planTripComparison(params: TripParams): TripComparison {
   const kmPerLitre = 100 / consumption;
   const startingFuel = totalCapacity * (startingFuelPct / 100);
 
-  const { deduped } = prepareRouteStations(stations, fuel, routeGeometry, totalDistance, params.allowFallback);
+  const { deduped } = prepareRouteStations(stations, fuel, routeGeometry, totalDistance, params.allowFallback, params.discounts ?? []);
 
   // Detect coverage gaps — warn if large sections of route have no stations
   const coverageWarnings: string[] = [];

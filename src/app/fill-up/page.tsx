@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { loadSettings } from "@/lib/settings";
 import { FUEL_TYPES } from "@/lib/fuel-codes";
 import type { FuelCode, Station } from "@/lib/types";
+import { loadDiscounts } from "@/lib/useDiscounts";
 
 const FillUpMap = dynamic(() => import("./FillUpMap"), { ssr: false });
 
@@ -13,6 +14,8 @@ const FillUpMap = dynamic(() => import("./FillUpMap"), { ssr: false });
 interface CandidateDto {
   station: Station;
   priceCpl: number;
+  pumpPriceCpl: number;
+  hasDiscount: boolean;
   detourKm: number;
   fillCostAud: number;
   detourFuelCostAud: number;
@@ -112,7 +115,10 @@ export default function FillUpPage() {
       const resp = await fetch("/api/fill-up", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ a, b, fuel, fillLitres, consumption }),
+        body: JSON.stringify({
+          a, b, fuel, fillLitres, consumption,
+          discounts: loadDiscounts(),
+        }),
       });
       const data = await resp.json();
       if (!resp.ok) {
@@ -344,6 +350,11 @@ function WinnerCard({ result }: { result: FillUpDto }) {
         <div className="text-right shrink-0">
           <div className="text-2xl font-bold text-emerald-700">{w.priceCpl.toFixed(1)}</div>
           <div className="text-xs text-emerald-700 -mt-1">c/L</div>
+          {w.hasDiscount && (
+            <div className="text-[10px] text-gray-500 line-through mt-0.5">
+              {w.pumpPriceCpl.toFixed(1)}
+            </div>
+          )}
         </div>
       </div>
       <dl className="grid grid-cols-2 gap-x-4 gap-y-1 mt-3 text-sm">

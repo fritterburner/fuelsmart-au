@@ -35,10 +35,17 @@ const EXCISE_VERDICT_COLOR: Record<Verdict, string> = {
   na: "#6b7280",          // gray-500 — fuel not excise-applicable
 };
 
-function createPriceIcon(price: number, color: string): L.DivIcon {
+function createPriceIcon(price: number, color: string, discounted: boolean = false): L.DivIcon {
+  // Discounted pins get a red ring via box-shadow so the visual asymmetry
+  // is obvious at a glance: green/red color = rank, red ring = "your saved
+  // discount applies here".
+  const ring = discounted ? "box-shadow:0 0 0 2px #dc2626;" : "";
+  const border = discounted
+    ? "border:1px solid rgba(0,0,0,0.2);"
+    : "border:1px solid rgba(0,0,0,0.2);";
   return L.divIcon({
     className: "price-marker",
-    html: `<div style="background:${color};color:white;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;white-space:nowrap;border:1px solid rgba(0,0,0,0.2);text-align:center;">${price.toFixed(1)}</div>`,
+    html: `<div style="background:${color};color:white;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;white-space:nowrap;${border}${ring}text-align:center;">${price.toFixed(1)}</div>`,
     iconSize: [60, 24],
     iconAnchor: [30, 12],
   });
@@ -81,11 +88,9 @@ function loadMapPosition(): { lat: number; lng: number; zoom: number } | null {
 
 function MapController({
   onBoundsChange,
-  onCenterChange,
   fuel,
 }: {
   onBoundsChange: (bounds: string) => void;
-  onCenterChange: (lat: number, lng: number) => void;
   fuel: FuelCode;
 }) {
   const map = useMap();
@@ -97,8 +102,6 @@ function MapController({
     moveend: () => {
       saveMapPosition(map);
       onBoundsChange(getBoundsString(map));
-      const c = map.getCenter();
-      onCenterChange(c.lat, c.lng);
     },
   });
 
@@ -335,7 +338,6 @@ export default function MapView({
   const [loading, setLoading] = useState(false);
   const [activeFuel, setActiveFuel] = useState<FuelCode>(fuel);
   const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
-  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const fetchController = useRef<AbortController | null>(null);
   const { discounts: activeDiscounts } = useDiscounts();
 
@@ -363,21 +365,34 @@ export default function MapView({
     [fuel]
   );
 
-  // Compute rank-based colour for each station with a price. We build a
-  // Map<stationId, color> in the same pass to avoid an O(n²) lookup below.
+  // Compute effective price (post-discount) per station, then rank by that
+  // and remember which stations had a discount applied so we can ring them.
   const displayFuel = activeFuel;
   const pricedStations = stations
     .map((s) => {
       const p = s.prices.find((pr) => pr.fuel === displayFuel)?.price;
-      return p != null ? { id: s.id, price: p } : null;
+      if (p == null) return null;
+      const eff = applyToStation(s, p, activeDiscounts);
+      return {
+        id: s.id,
+        effectiveCpl: eff.effectiveCpl,
+        hasDiscount: eff.applied.length > 0,
+      };
     })
-    .filter((x): x is { id: string; price: number } => x != null);
+    .filter(
+      (x): x is { id: string; effectiveCpl: number; hasDiscount: boolean } =>
+        x != null,
+    );
   const rankColors = assignRankColors(
-    pricedStations.map((s) => s.price),
+    pricedStations.map((s) => s.effectiveCpl),
     cheapestHighlightCount,
   );
   const colorById = new Map<string, string>();
-  pricedStations.forEach((s, i) => colorById.set(s.id, rankColors[i]));
+  const effectiveById = new Map<string, { effectiveCpl: number; hasDiscount: boolean }>();
+  pricedStations.forEach((s, i) => {
+    colorById.set(s.id, rankColors[i]);
+    effectiveById.set(s.id, { effectiveCpl: s.effectiveCpl, hasDiscount: s.hasDiscount });
+  });
 
   // Use saved map position, or fall back to a broad Australia view
   const saved = loadMapPosition();
@@ -392,7 +407,6 @@ export default function MapView({
       />
       <MapController
         onBoundsChange={fetchStations}
-        onCenterChange={(lat, lng) => setMapCenter({ lat, lng })}
         fuel={fuel}
       />
       <FlyTo center={flyTo} />
@@ -454,8 +468,11 @@ export default function MapView({
         }
 
         // Default: rank-based colouring (cheapest N green, tail red/orange, middle gray).
+        // Bubble shows effective (post-discount) price; affected stations get a red ring.
         const color = colorById.get(station.id) ?? "#6b7280";
-        const icon = createPriceIcon(priceEntry.price, color);
+        const eff = effectiveById.get(station.id);
+        const labelPrice = eff?.effectiveCpl ?? priceEntry.price;
+        const icon = createPriceIcon(labelPrice, color, eff?.hasDiscount ?? false);
 
         return (
           <Marker key={station.id} position={[station.lat, station.lng]} icon={icon}>

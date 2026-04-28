@@ -4,6 +4,7 @@ import { findBestStop } from "@/lib/fill-up/find-best-stop";
 import { osrmRoute, OsrmThrottledError } from "@/lib/fill-up/osrm";
 import { haversine } from "@/lib/trip-planner";
 import type { FuelCode } from "@/lib/types";
+import type { Discount } from "@/lib/discounts";
 
 /**
  * Click-A-click-B cheapest-fuel recommendation.
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  const { a, b, fuel, fillLitres, consumption } = parsed;
+  const { a, b, fuel, fillLitres, consumption, discounts } = parsed;
 
   // Reject same-point / too-close requests — this isn't a trip.
   if (haversine(a.lat, a.lng, b.lat, b.lng) < 1) {
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await findBestStop(
-      { a, b, stations, fuel, fillLitres, consumption },
+      { a, b, stations, fuel, fillLitres, consumption, discounts },
       { osrmRoute },
     );
     return NextResponse.json(result);
@@ -84,6 +85,7 @@ interface ParsedBody {
   fuel: FuelCode;
   fillLitres: number;
   consumption: number;
+  discounts: Discount[];
 }
 
 function validate(body: unknown): ParsedBody | { error: string } {
@@ -109,7 +111,11 @@ function validate(body: unknown): ParsedBody | { error: string } {
     return { error: "consumption (L/100km) must be between 2 and 40" };
   }
 
-  return { a, b, fuel: o.fuel as FuelCode, fillLitres, consumption };
+  // Discounts are optional. Trust the client's saved shape — `applyToStation`
+  // tolerates extra fields and only acts on enabled `fixed_cpl`/`percent_cashback`.
+  const discounts = Array.isArray(o.discounts) ? (o.discounts as Discount[]) : [];
+
+  return { a, b, fuel: o.fuel as FuelCode, fillLitres, consumption, discounts };
 }
 
 function parseLatLng(v: unknown): { lat: number; lng: number } | null {

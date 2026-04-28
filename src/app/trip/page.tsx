@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import TripForm from "@/components/TripForm";
 import TripResults from "@/components/TripResults";
 import { TripComparison, TripStrategy, FuelCode } from "@/lib/types";
+import { loadDiscounts } from "@/lib/useDiscounts";
 
 const TripMap = dynamic(() => import("@/components/TripMap"), { ssr: false });
 
@@ -49,6 +50,14 @@ export default function TripPage() {
 
     if (data.viaCoords.length > 0) {
       params.set("via", data.viaCoords.map((c) => c.join(",")).join("|"));
+    }
+
+    // Pass user's saved discounts so the planner ranks by effective price.
+    // Only attach when there's at least one enabled discount — keeps the URL
+    // clean otherwise.
+    const enabledDiscounts = loadDiscounts().filter((d) => d.enabled);
+    if (enabledDiscounts.length > 0) {
+      params.set("discounts", JSON.stringify(enabledDiscounts));
     }
 
     const resp = await fetch(`/api/trip-plan?${params}`);

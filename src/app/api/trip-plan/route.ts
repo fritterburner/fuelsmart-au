@@ -3,6 +3,7 @@ import { getCachedStations } from "@/lib/cache";
 import { planTripComparison, haversine } from "@/lib/trip-planner";
 import { FuelCode, DestinationFuelInfo } from "@/lib/types";
 import { FUEL_FALLBACKS } from "@/lib/fuel-codes";
+import { applyToStation, type Discount } from "@/lib/discounts";
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -18,6 +19,19 @@ export async function GET(request: NextRequest) {
   const arriveFull = params.get("arriveFull") === "1"; // off by default
   const reservePct = Math.min(30, Math.max(0, Number(params.get("reservePct") || 10)));
   const returnTrip = params.get("returnTrip") === "1";
+
+  // Discounts ride along as URL-encoded JSON. Parse defensively — anything
+  // malformed just falls back to "no discounts" rather than failing the trip.
+  let discounts: Discount[] = [];
+  const rawDiscounts = params.get("discounts");
+  if (rawDiscounts) {
+    try {
+      const parsed = JSON.parse(rawDiscounts);
+      if (Array.isArray(parsed)) discounts = parsed as Discount[];
+    } catch {
+      // ignore — empty discounts means rank by pump price
+    }
+  }
 
   if (!origin || !dest) {
     return NextResponse.json({ error: "origin and dest required" }, { status: 400 });
@@ -98,6 +112,7 @@ export async function GET(request: NextRequest) {
     allowFallback,
     arriveFull,
     reservePct,
+    discounts,
   });
 
   // Find cheapest fuel near final destination (within 25km)
@@ -121,7 +136,8 @@ export async function GET(request: NextRequest) {
         }
       }
       if (!priceEntry) return null;
-      return { station: s, price: priceEntry.price, fuel: usedFuel as FuelCode, distance: dist };
+      const eff = applyToStation(s, priceEntry.price, discounts);
+      return { station: s, price: eff.effectiveCpl, fuel: usedFuel as FuelCode, distance: dist };
     })
     .filter(Boolean) as { station: typeof stations[0]; price: number; fuel: FuelCode; distance: number }[];
 

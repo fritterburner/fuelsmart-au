@@ -12,6 +12,7 @@ import type { Station, FuelCode } from "../types";
 import { FUEL_FALLBACKS } from "../fuel-codes";
 import { haversine } from "../trip-planner";
 import { OsrmThrottledError, type OsrmResult } from "./osrm";
+import { applyToStation, type Discount } from "../discounts";
 
 // --- Public types ---------------------------------------------------------
 
@@ -30,11 +31,18 @@ export interface FindBestStopInput {
   fillLitres: number;
   /** L/100km from user settings. */
   consumption: number;
+  /** User's saved discounts. Empty array = no discounts. */
+  discounts?: Discount[];
 }
 
 export interface CandidateResult {
   station: Station;
+  /** Effective cents/L the user actually pays here (post-discount). */
   priceCpl: number;
+  /** Pump-board cents/L before any discount. Equals priceCpl when no discount applied. */
+  pumpPriceCpl: number;
+  /** True iff any of the user's saved discounts applied to this station. */
+  hasDiscount: boolean;
   detourKm: number;
   fillCostAud: number;
   detourFuelCostAud: number;
@@ -137,6 +145,7 @@ export async function findBestStop(
   deps: FindBestStopDeps,
 ): Promise<FindBestStopResult> {
   const { a, b, stations, fuel, fillLitres, consumption } = input;
+  const discounts = input.discounts ?? [];
 
   // 1. Resolve fuel + fallback chain.
   const { fuelUsed, pool, fallbackNotice } = resolveFuel(stations, fuel);
@@ -144,13 +153,29 @@ export async function findBestStop(
   // 2. Corridor filter (cheap): bbox + perpendicular distance to A-B line.
   const corridor = filterCorridor(pool, a, b).slice(0, MAX_CORRIDOR_CANDIDATES);
 
-  // 3. Top-N by c/L.
+  // 3. Top-N by effective c/L (post-discount). The user pays the discounted
+  //    rate at the till, so that's what we rank by — otherwise we'd overlook
+  //    a brand-loyalty station that's only cheap *for them*.
   const priced = corridor
     .map((s) => {
       const entry = s.prices.find((p) => p.fuel === fuelUsed);
-      return entry ? { station: s, priceCpl: entry.price } : null;
+      if (!entry) return null;
+      const eff = applyToStation(s, entry.price, discounts);
+      return {
+        station: s,
+        priceCpl: eff.effectiveCpl,
+        pumpPriceCpl: entry.price,
+        hasDiscount: eff.applied.length > 0,
+      };
     })
-    .filter((x): x is { station: Station; priceCpl: number } => x != null);
+    .filter(
+      (x): x is {
+        station: Station;
+        priceCpl: number;
+        pumpPriceCpl: number;
+        hasDiscount: boolean;
+      } => x != null,
+    );
 
   priced.sort((x, y) => x.priceCpl - y.priceCpl);
   const topCandidates = priced.slice(0, MAX_OSRM_CANDIDATES);
@@ -180,7 +205,7 @@ export async function findBestStop(
   const candidates: CandidateResult[] = await mapWithConcurrency(
     topCandidates,
     OSRM_CONCURRENCY,
-    async ({ station, priceCpl }) => {
+    async ({ station, priceCpl, pumpPriceCpl, hasDiscount }) => {
       const via = await osrmWithRetry(deps.osrmRoute, [
         [a.lat, a.lng],
         [station.lat, station.lng],
@@ -195,6 +220,8 @@ export async function findBestStop(
       return {
         station,
         priceCpl,
+        pumpPriceCpl,
+        hasDiscount,
         detourKm,
         fillCostAud,
         detourFuelCostAud,
