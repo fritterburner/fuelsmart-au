@@ -208,7 +208,7 @@ export default function FillUpPage() {
             </select>
           </label>
           <label className="flex items-center gap-1">
-            <span className="text-slate-300">Fill</span>
+            <span className="text-slate-300">Expected fill</span>
             <input
               type="number"
               value={fillLitres}
