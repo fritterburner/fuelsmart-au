@@ -10,6 +10,8 @@ interface TripParams {
   routeGeometry: [number, number][]; // [lat, lng] pairs
   stations: Station[];
   totalDistance: number; // km
+  /** OSRM-reported driving time for the whole route, in seconds. Threaded into the result for ETA display. */
+  totalDurationSeconds?: number;
   startingFuelPct?: number; // 0-100, defaults to 100
   allowFallback?: boolean; // use LAF/OPAL when primary fuel unavailable
   arriveFull?: boolean; // fill to brim at cheapest stops (arrive with max fuel)
@@ -489,7 +491,7 @@ function buildStrategyResult(
   const labels = {
     optimised: "Optimised",
     cheapest_fill: "Cheapest Fill-Up",
-    no_planning: "No Planning",
+    no_planning: "Stop when low",
   };
   const descriptions = {
     optimised: "Buys only what you need at the cheapest stations — lowest trip cost",
@@ -597,6 +599,7 @@ export function planTripComparison(params: TripParams): TripComparison {
       label: "Destination",
     },
     totalDistance,
+    totalDurationSeconds: params.totalDurationSeconds ?? 0,
     routeGeometry,
     strategies: [
       buildStrategyResult("optimised", optimised.stops, optimised.warnings, fuelAtDest(optimised), 0),

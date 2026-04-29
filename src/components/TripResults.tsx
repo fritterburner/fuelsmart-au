@@ -1,6 +1,17 @@
 "use client";
 
 import { TripComparison, StrategyResult, TripStrategy } from "@/lib/types";
+import StationNavLinks from "./StationNavLinks";
+
+/** "1h 23m" / "47m" / "2h" — abbreviated drive time shown per stop. */
+function formatDrive(seconds: number): string {
+  if (!seconds || seconds <= 0) return "";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.round((seconds % 3600) / 60);
+  if (hours === 0) return `${minutes}m`;
+  if (minutes === 0) return `${hours}h`;
+  return `${hours}h ${minutes}m`;
+}
 
 const STRATEGY_COLORS: Record<TripStrategy, { bg: string; border: string; text: string; dot: string }> = {
   optimised: { bg: "bg-emerald-50", border: "border-emerald-300", text: "text-emerald-700", dot: "#22c55e" },
@@ -32,65 +43,67 @@ function StrategyCard({
         selected ? `${colors.bg} ${colors.border} shadow-md` : "bg-white border-gray-200 hover:border-gray-300 active:border-gray-400"
       }`}
     >
-      {/* Horizontal layout on mobile, vertical on desktop */}
-      <div className="flex items-center gap-3 md:block">
-        {/* Left side: label + price */}
-        <div className="flex-1 md:flex-none">
-          <div className="flex items-center gap-2 md:mb-2">
-            <div className="w-3 h-3 rounded-full shrink-0" style={{ background: colors.dot }} />
-            <span className={`font-bold text-sm ${selected ? colors.text : "text-gray-700"}`}>
-              {result.label}
-            </span>
-          </div>
-
-          {hasDestFuel ? (
-            <>
-              <div className="text-xl md:text-2xl font-bold text-gray-900">
-                ${result.trueTripCost.toFixed(2)}
-              </div>
-              <div className="text-xs text-gray-500 mt-0.5">
-                Trip ${result.totalFuelCost.toFixed(2)} + dest fill ${result.destinationFillCost.toFixed(2)}
-              </div>
-            </>
-          ) : (
-            <div className="text-xl md:text-2xl font-bold text-gray-900">${result.totalFuelCost.toFixed(2)}</div>
-          )}
-          <div className="text-xs text-gray-500 mt-0.5 md:mt-1 hidden md:block">{result.description}</div>
-        </div>
-
-        {/* Right side: stats — compact row on mobile */}
-        <div className="flex gap-3 md:mt-2 md:grid md:grid-cols-3 md:gap-2 text-xs text-center md:text-left">
-          <div>
-            <span className="font-medium text-gray-900">{result.stops.length}</span>
-            <span className="text-gray-500 ml-0.5 md:ml-0 md:block"> stops</span>
-          </div>
-          <div>
-            <span className="font-medium text-gray-900">{result.totalLitres.toFixed(0)}L</span>
-            <span className="text-gray-500 ml-0.5 md:ml-0 md:block hidden md:inline"> fuel</span>
-          </div>
-          <div>
-            <span className="font-medium text-gray-900">{result.fuelAtDestination.toFixed(0)}L</span>
-            <span className="text-gray-500 ml-0.5 md:ml-0 md:block hidden md:inline"> on arrival</span>
-          </div>
-        </div>
-
-        {/* Savings badge */}
-        <div className="shrink-0 md:mt-2">
+      {/* Header row: label dot, name, savings badge inline */}
+      <div className="flex items-center gap-2 mb-1.5 md:mb-2">
+        <div className="w-3 h-3 rounded-full shrink-0" style={{ background: colors.dot }} />
+        <span className={`font-bold text-sm ${selected ? colors.text : "text-gray-700"}`}>
+          {result.label}
+        </span>
+        <span className="ml-auto">
           {extra > 0.5 && (
-            <div className="text-xs font-medium text-red-600 whitespace-nowrap">
+            <span className="text-xs font-medium text-red-600 whitespace-nowrap">
               +${extra.toFixed(2)}
-            </div>
+            </span>
           )}
           {extra <= 0.5 && extra >= -0.5 && (
-            <div className="text-xs font-medium text-emerald-600 whitespace-nowrap">Best</div>
+            <span className="text-xs font-medium text-emerald-600 whitespace-nowrap">Best</span>
           )}
+        </span>
+      </div>
+
+      {/* Price */}
+      {hasDestFuel ? (
+        <>
+          <div className="text-xl md:text-2xl font-bold text-gray-900">
+            ${result.trueTripCost.toFixed(2)}
+          </div>
+          <div className="text-xs text-gray-500 mt-0.5">
+            Trip ${result.totalFuelCost.toFixed(2)} + dest fill ${result.destinationFillCost.toFixed(2)}
+          </div>
+        </>
+      ) : (
+        <div className="text-xl md:text-2xl font-bold text-gray-900">${result.totalFuelCost.toFixed(2)}</div>
+      )}
+      <div className="text-xs text-gray-500 mt-0.5 md:mt-1 hidden md:block">{result.description}</div>
+
+      {/* Stats with full labels at every breakpoint — easier to scan than three bare numbers. */}
+      <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+        <div>
+          <span className="font-medium text-gray-900">{result.stops.length}</span>
+          <span className="text-gray-500"> stop{result.stops.length !== 1 ? "s" : ""}</span>
+        </div>
+        <div>
+          <span className="font-medium text-gray-900">{result.totalLitres.toFixed(0)}L</span>
+          <span className="text-gray-500"> fuel</span>
+        </div>
+        <div>
+          <span className="font-medium text-gray-900">{result.fuelAtDestination.toFixed(0)}L</span>
+          <span className="text-gray-500"> arrival</span>
         </div>
       </div>
     </button>
   );
 }
 
-function StopList({ result }: { result: StrategyResult }) {
+function StopList({
+  result,
+  totalDistance,
+  totalDurationSeconds,
+}: {
+  result: StrategyResult;
+  totalDistance: number;
+  totalDurationSeconds: number;
+}) {
   const colors = STRATEGY_COLORS[result.strategy];
 
   return (
@@ -103,7 +116,13 @@ function StopList({ result }: { result: StrategyResult }) {
       {result.stops.length === 0 && (
         <p className="text-gray-500 text-sm">No fuel stops needed -- you can make it on a full tank!</p>
       )}
-      {result.stops.map((stop, i) => (
+      {result.stops.map((stop, i) => {
+        const driveSeconds =
+          totalDistance > 0 && totalDurationSeconds > 0
+            ? (stop.distanceFromStart / totalDistance) * totalDurationSeconds
+            : 0;
+        const driveLabel = formatDrive(driveSeconds);
+        return (
         <div key={i} className={`border rounded-lg p-3 md:p-4 ${colors.bg} ${colors.border}`}>
           {/* Header: stop badge + station name */}
           <div className="flex items-start gap-2 mb-1">
@@ -113,11 +132,14 @@ function StopList({ result }: { result: StrategyResult }) {
             <span className="font-bold text-gray-900 text-sm md:text-base">{stop.station.name}</span>
           </div>
 
-          {/* Address + distance */}
-          <div className="text-sm text-gray-500 ml-0 md:ml-0">
+          {/* Address + distance + drive time */}
+          <div className="text-sm text-gray-500">
             {stop.station.address}, {stop.station.suburb} {stop.station.state}
           </div>
-          <div className="text-sm text-gray-500 mb-2">{stop.distanceFromStart.toFixed(0)} km from start</div>
+          <div className="text-sm text-gray-500 mb-2">
+            {stop.distanceFromStart.toFixed(0)} km from start
+            {driveLabel && <> · {driveLabel} drive</>}
+          </div>
 
           {/* Price details — stacked on mobile, inline on desktop */}
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 text-sm mb-2">
@@ -145,8 +167,15 @@ function StopList({ result }: { result: StrategyResult }) {
             </div>
             <span className="shrink-0">Depart {stop.fuelOnDeparture.toFixed(0)}L</span>
           </div>
+
+          <StationNavLinks
+            lat={stop.station.lat}
+            lng={stop.station.lng}
+            name={stop.station.name}
+          />
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -232,7 +261,11 @@ export default function TripResults({
           />
           {selected.label} — {selected.stops.length} stop{selected.stops.length !== 1 ? "s" : ""}
         </h3>
-        <StopList result={selected} />
+        <StopList
+          result={selected}
+          totalDistance={comparison.totalDistance}
+          totalDurationSeconds={comparison.totalDurationSeconds}
+        />
       </div>
     </div>
   );

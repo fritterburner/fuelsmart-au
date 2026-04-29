@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { FuelCode, VehicleProfile } from "@/lib/types";
 import { FUEL_TYPES, FUEL_FALLBACKS } from "@/lib/fuel-codes";
 import { loadVehicles, saveVehicle, deleteVehicle } from "@/lib/vehicles";
+import { isInNorthernTerritory } from "@/lib/nt-bounds";
 import LocationInput from "./LocationInput";
 
 interface TripFormData {
@@ -239,6 +240,32 @@ export default function TripForm({ onSubmit, loading }: Props) {
 
   const startingLitres = Math.round(form.startingFuelPct / 100 * form.tank);
 
+  // Show the LAF/OPAL toggle only when (a) the chosen fuel has fallbacks and
+  // (b) at least one geocoded coordinate lands inside the NT bounds. Outside
+  // NT, OPAL/LAF is irrelevant — leaving the toggle visible just adds noise
+  // to the advanced settings.
+  const routeTouchesNT = (() => {
+    if (originCoords && isInNorthernTerritory(originCoords[0], originCoords[1])) return true;
+    if (destCoords && isInNorthernTerritory(destCoords[0], destCoords[1])) return true;
+    return viaCoords.some((c) => c && isInNorthernTerritory(c[0], c[1]));
+  })();
+  const showFallbackToggle = !!FUEL_FALLBACKS[form.fuel] && routeTouchesNT;
+
+  function handleUseMyLocation() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const label = "My current location";
+        setForm((f) => ({ ...f, originQuery: label }));
+        setOriginCoords([pos.coords.latitude, pos.coords.longitude]);
+      },
+      () => {
+        // Silent fail — user will fall back to typing.
+      },
+      { timeout: 10000 },
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-3 md:space-y-4">
       {/* Google Maps Import — collapsible */}
@@ -272,7 +299,17 @@ export default function TripForm({ onSubmit, loading }: Props) {
 
       {/* Origin */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Origin</label>
+        <div className="flex items-baseline justify-between mb-1">
+          <label className="block text-sm font-medium text-gray-700">Origin</label>
+          <button
+            type="button"
+            onClick={handleUseMyLocation}
+            className="text-xs text-emerald-700 hover:text-emerald-800 active:text-emerald-900 transition-colors"
+            title="Use this device's current location"
+          >
+            📍 Use my location
+          </button>
+        </div>
         <LocationInput
           value={form.originQuery}
           onChange={(v) => {
@@ -387,27 +424,6 @@ export default function TripForm({ onSubmit, loading }: Props) {
           ) : null}
         </span>
       </label>
-
-      {/* Starting Fuel Level slider */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Starting Fuel Level
-        </label>
-        <div className="flex items-center gap-3">
-          <input
-            type="range"
-            min={0}
-            max={100}
-            step={5}
-            value={form.startingFuelPct}
-            onChange={(e) => set("startingFuelPct", Number(e.target.value))}
-            className="flex-1 min-h-[44px] accent-emerald-600"
-          />
-          <span className="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[110px] text-right">
-            {form.startingFuelPct}% ({startingLitres}L of {form.tank}L)
-          </span>
-        </div>
-      </div>
 
       {/* Vehicle profile selector + settings */}
       <div>
@@ -525,65 +541,102 @@ export default function TripForm({ onSubmit, loading }: Props) {
         </div>
       </div>
 
-      {/* LAF fallback toggle — only show when fuel has defined fallbacks */}
-      {FUEL_FALLBACKS[form.fuel] && (
-        <label className="flex items-center gap-3 cursor-pointer">
-          <div className="relative">
-            <input
-              type="checkbox"
-              checked={form.allowFallback}
-              onChange={(e) => set("allowFallback", e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-emerald-500 transition-colors" />
-            <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform" />
+      {/* Advanced settings — collapsed by default to keep the first-time
+          form short. Power users open it for fine control. */}
+      <details className="group rounded-lg border border-gray-200 bg-gray-50">
+        <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 active:bg-gray-100 rounded-lg flex items-center justify-between">
+          <span>Advanced settings</span>
+          <span className="text-xs text-gray-500 group-open:hidden">
+            starting fuel, reserve, full-tank, fallback fuel
+          </span>
+        </summary>
+        <div className="px-3 pb-3 pt-2 space-y-4 border-t border-gray-200">
+          {/* Starting Fuel Level slider */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Starting fuel level
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={5}
+                value={form.startingFuelPct}
+                onChange={(e) => set("startingFuelPct", Number(e.target.value))}
+                className="flex-1 min-h-[44px] accent-emerald-600"
+              />
+              <span className="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[110px] text-right">
+                {form.startingFuelPct}% ({startingLitres}L of {form.tank}L)
+              </span>
+            </div>
           </div>
-          <span className="text-sm text-gray-700">
-            Use Low Aromatic / OPAL fuel where {FUEL_TYPES.find(f => f.code === form.fuel)?.name || form.fuel} unavailable
-          </span>
-        </label>
-      )}
 
-      {/* Arrive with full tank toggle */}
-      <label className="flex items-center gap-3 cursor-pointer">
-        <div className="relative">
-          <input
-            type="checkbox"
-            checked={form.arriveFull}
-            onChange={(e) => set("arriveFull", e.target.checked)}
-            className="sr-only peer"
-          />
-          <div className="w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-emerald-500 transition-colors" />
-          <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform" />
-        </div>
-        <span className="text-sm text-gray-700">
-          Arrive with full tank (stock up at cheapest stops)
-        </span>
-      </label>
+          {/* Arrive with full tank toggle */}
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={form.arriveFull}
+                onChange={(e) => set("arriveFull", e.target.checked)}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-emerald-500 transition-colors" />
+              <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform" />
+            </div>
+            <span className="text-sm text-gray-700">
+              Arrive with full tank (stock up at cheapest stops)
+            </span>
+          </label>
 
-      {/* Fuel reserve threshold slider */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Minimum Fuel Reserve
-        </label>
-        <div className="flex items-center gap-3">
-          <input
-            type="range"
-            min={0}
-            max={30}
-            step={5}
-            value={form.reservePct}
-            onChange={(e) => set("reservePct", Number(e.target.value))}
-            className="flex-1 min-h-[44px] accent-emerald-600"
-          />
-          <span className="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[110px] text-right">
-            {form.reservePct}% ({Math.round(form.reservePct / 100 * form.tank)}L of {form.tank}L)
-          </span>
+          {/* Fuel reserve threshold slider */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Minimum fuel reserve
+            </label>
+            <div className="flex items-center gap-3">
+              <input
+                type="range"
+                min={0}
+                max={30}
+                step={5}
+                value={form.reservePct}
+                onChange={(e) => set("reservePct", Number(e.target.value))}
+                className="flex-1 min-h-[44px] accent-emerald-600"
+              />
+              <span className="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[110px] text-right">
+                {form.reservePct}% ({Math.round(form.reservePct / 100 * form.tank)}L of {form.tank}L)
+              </span>
+            </div>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Never arrive at a stop with less than this in the tank
+            </p>
+          </div>
+
+          {/* LAF/OPAL fallback toggle — only relevant when route touches NT
+              and the chosen fuel has a fallback chain. Outside NT it's noise. */}
+          {showFallbackToggle && (
+            <label className="flex items-center gap-3 cursor-pointer">
+              <div className="relative">
+                <input
+                  type="checkbox"
+                  checked={form.allowFallback}
+                  onChange={(e) => set("allowFallback", e.target.checked)}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-emerald-500 transition-colors" />
+                <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform" />
+              </div>
+              <span className="text-sm text-gray-700">
+                Use Low Aromatic / OPAL fuel where {FUEL_TYPES.find(f => f.code === form.fuel)?.name || form.fuel} unavailable
+                <span className="block text-xs text-gray-500">
+                  Remote NT communities sell unleaded as LAF/OPAL — same engine.
+                </span>
+              </span>
+            </label>
+          )}
         </div>
-        <p className="text-xs text-gray-500 mt-0.5">
-          Never arrive at a stop with less than this in the tank
-        </p>
-      </div>
+      </details>
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
 

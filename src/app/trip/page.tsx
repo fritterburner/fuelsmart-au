@@ -84,7 +84,7 @@ export default function TripPage() {
             <path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" />
           </svg>
         </a>
-        <h1 className="font-bold text-lg">Trip Planner</h1>
+        <h1 className="font-bold text-lg">Plan a trip</h1>
       </div>
 
       <div className="px-3 py-4 space-y-4 md:max-w-5xl md:mx-auto md:px-4 md:py-6 md:space-y-6">

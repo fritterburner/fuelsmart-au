@@ -6,6 +6,8 @@ import { loadSettings } from "@/lib/settings";
 import { FUEL_TYPES } from "@/lib/fuel-codes";
 import type { FuelCode, Station } from "@/lib/types";
 import { loadDiscounts } from "@/lib/useDiscounts";
+import { formatAge } from "@/lib/time-format";
+import StationNavLinks from "@/components/StationNavLinks";
 
 const FillUpMap = dynamic(() => import("./FillUpMap"), { ssr: false });
 
@@ -81,6 +83,23 @@ export default function FillUpPage() {
     setError(null);
   }
 
+  function useMyLocation() {
+    if (!navigator.geolocation) {
+      setError("Your browser doesn't support geolocation.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setResult(null);
+        setError(null);
+        setA({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setPlacing(b ? "done" : "b");
+      },
+      () => setError("Couldn't get your location — pick the start point on the map."),
+      { timeout: 10000 },
+    );
+  }
+
   // Cycle reassurance messages while loading — routing can take 2–4s with the
   // concurrency cap (and longer if a 429 retry fires). Gives the user a sense
   // of "we're working on it" without faking precise progress.
@@ -134,10 +153,16 @@ export default function FillUpPage() {
   }
 
   const banner = useMemo(() => {
-    if (placing === "a") return "Step 1: Tap the map where you're starting from.";
-    if (placing === "b") return "Step 2: Tap where you're heading.";
-    return "Ready — tap Find the best stop, or tap the map to adjust point B.";
+    if (placing === "a") return "Choose your starting point on the map.";
+    if (placing === "b") return "Now choose where you're heading.";
+    return "Ready — tap the map to adjust point B, or find the best stop.";
   }, [placing]);
+
+  const winnerPriceUpdated = useMemo(() => {
+    if (!result?.winner) return null;
+    const entry = result.winner.station.prices.find((p) => p.fuel === result.fuelUsed);
+    return entry?.updated ?? null;
+  }, [result]);
 
   const shortlistPins = useMemo(
     () =>
@@ -179,8 +204,15 @@ export default function FillUpPage() {
             </svg>
           </a>
           <div className="flex-1 min-w-0">
-            <h1 className="font-bold text-base md:text-lg leading-tight">Fill-Up Finder</h1>
-            <p className="text-xs md:text-sm text-slate-300 truncate">{banner}</p>
+            <h1 className="font-bold text-base md:text-lg leading-tight">Find a stop</h1>
+            {placing === "a" && !a && (
+              <p className="text-xs md:text-sm text-slate-300 truncate">
+                Heading A → B today? We&apos;ll find the cheapest fill-up worth the detour.
+              </p>
+            )}
+            {(placing !== "a" || a) && (
+              <p className="text-xs md:text-sm text-slate-300 truncate" aria-live="polite">{banner}</p>
+            )}
           </div>
           <button
             onClick={resetPins}
@@ -190,6 +222,25 @@ export default function FillUpPage() {
             Reset
           </button>
         </div>
+
+        {/* Step pill: visual progress for picking A and B. Hidden once both placed. */}
+        {placing !== "done" && (
+          <div className="px-3 pb-1 flex items-center gap-2 text-xs">
+            <StepDot active={placing === "a"} done={!!a} label="Start" />
+            <span className="text-slate-500" aria-hidden="true">—</span>
+            <StepDot active={placing === "b"} done={!!b} label="Destination" />
+            {placing === "a" && !a && (
+              <button
+                type="button"
+                onClick={useMyLocation}
+                className="ml-auto inline-flex items-center gap-1 px-2 py-1 rounded-md bg-slate-700 hover:bg-slate-600 active:bg-slate-600 text-slate-100 transition-colors"
+                title="Use my current location for the start point"
+              >
+                <span aria-hidden="true">📍</span> Use my location
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Controls row */}
         <div className="flex flex-wrap items-center gap-2 px-3 pb-2 text-sm">
@@ -270,6 +321,17 @@ export default function FillUpPage() {
           shortlist={shortlistPins}
           routeGeometry={result?.winner?.geometry ?? null}
         />
+        {/* Floating CTA: appears once both points are placed, before a result. */}
+        {placing === "done" && !result && !loading && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[1000]">
+            <button
+              onClick={findBest}
+              className="px-5 py-3 min-h-[48px] rounded-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-sm font-bold shadow-lg transition-colors"
+            >
+              Find the best stop →
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Results panel */}
@@ -290,7 +352,7 @@ export default function FillUpPage() {
                 )}
 
                 {result.winner ? (
-                  <WinnerCard result={result} />
+                  <WinnerCard result={result} priceUpdated={winnerPriceUpdated} />
                 ) : (
                   <div className="text-sm text-gray-600">
                     No fuel stations found along this route. Try picking different points or a closer pair.
@@ -306,18 +368,21 @@ export default function FillUpPage() {
                       {result.shortlist.map((c) => (
                         <li
                           key={c.station.id}
-                          className="flex items-center justify-between gap-3 px-3 py-2 bg-slate-50 rounded-lg"
+                          className="px-3 py-2 bg-slate-50 rounded-lg"
                         >
-                          <div className="min-w-0">
-                            <div className="font-medium truncate">{c.station.name}</div>
-                            <div className="text-xs text-gray-500 truncate">
-                              {c.station.suburb} · {c.priceCpl.toFixed(1)} c/L · detour {c.detourKm.toFixed(1)} km
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="font-medium truncate">{c.station.name}</div>
+                              <div className="text-xs text-gray-500 truncate">
+                                {c.station.suburb} · {c.priceCpl.toFixed(1)} c/L · detour {c.detourKm.toFixed(1)} km
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <div className="font-bold">${c.totalCostAud.toFixed(2)}</div>
+                              <div className="text-xs text-gray-500">total</div>
                             </div>
                           </div>
-                          <div className="text-right shrink-0">
-                            <div className="font-bold">${c.totalCostAud.toFixed(2)}</div>
-                            <div className="text-xs text-gray-500">total</div>
-                          </div>
+                          <StationNavLinks lat={c.station.lat} lng={c.station.lng} name={c.station.name} />
                         </li>
                       ))}
                     </ul>
@@ -332,7 +397,7 @@ export default function FillUpPage() {
   );
 }
 
-function WinnerCard({ result }: { result: FillUpDto }) {
+function WinnerCard({ result, priceUpdated }: { result: FillUpDto; priceUpdated: string | null }) {
   const w = result.winner!;
   const saves = result.savingsVsOnRoute;
   return (
@@ -380,7 +445,29 @@ function WinnerCard({ result }: { result: FillUpDto }) {
       )}
       <p className="mt-2 text-[11px] text-gray-500">
         Direct trip {result.directKm.toFixed(1)} km · fuel: {result.fuelUsed}
+        {priceUpdated && <> · price updated {formatAge(priceUpdated)}</>}
       </p>
+      <StationNavLinks lat={w.station.lat} lng={w.station.lng} name={w.station.name} />
     </div>
+  );
+}
+
+function StepDot({ active, done, label }: { active: boolean; done: boolean; label: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span
+        aria-hidden="true"
+        className={
+          done
+            ? "inline-block w-2.5 h-2.5 rounded-full bg-emerald-400"
+            : active
+              ? "inline-block w-2.5 h-2.5 rounded-full ring-2 ring-emerald-300 ring-offset-1 ring-offset-slate-800 bg-emerald-500"
+              : "inline-block w-2.5 h-2.5 rounded-full bg-slate-500"
+        }
+      />
+      <span className={done ? "text-emerald-300" : active ? "text-white font-medium" : "text-slate-400"}>
+        {label}
+      </span>
+    </span>
   );
 }

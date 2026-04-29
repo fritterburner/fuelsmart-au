@@ -93,6 +93,8 @@ export async function GET(request: NextRequest) {
     ([lng, lat]: [number, number]) => [lat, lng]
   );
   const totalDistance = route.distance / 1000;
+  const totalDurationSeconds: number =
+    typeof route.duration === "number" ? route.duration : 0;
 
   // Get stations
   const stations = await getCachedStations();
@@ -108,6 +110,7 @@ export async function GET(request: NextRequest) {
     routeGeometry,
     stations,
     totalDistance,
+    totalDurationSeconds,
     startingFuelPct: startFuel,
     allowFallback,
     arriveFull,

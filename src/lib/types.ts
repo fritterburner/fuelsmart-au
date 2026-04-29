@@ -92,6 +92,8 @@ export interface TripComparison {
   origin: { lat: number; lng: number; label: string };
   destination: { lat: number; lng: number; label: string };
   totalDistance: number; // km
+  /** OSRM-reported driving time for the whole route, in seconds. Lets the UI compute per-stop ETAs. */
+  totalDurationSeconds: number;
   routeGeometry: [number, number][];
   strategies: StrategyResult[];
   destinationFuel?: DestinationFuelInfo;
