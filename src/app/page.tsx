@@ -91,12 +91,38 @@ export default function Home() {
             </a>
           )}
 
+          {/* Mobile: icon-only shortcuts to the two planning tools. */}
+          <a
+            href="/fill-up"
+            className="md:hidden inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg bg-emerald-600 active:bg-emerald-700 transition-colors text-lg"
+            aria-label="Find a stop"
+            title="Find a stop"
+          >
+            <span aria-hidden="true">📍</span>
+          </a>
+          <a
+            href="/trip"
+            className="md:hidden inline-flex items-center justify-center min-w-[44px] min-h-[44px] rounded-lg bg-emerald-600 active:bg-emerald-700 transition-colors text-lg"
+            aria-label="Plan a trip"
+            title="Plan a trip"
+          >
+            <span aria-hidden="true">🚗</span>
+          </a>
+
+          {/* Desktop: labelled buttons for both planning tools. */}
+          <a
+            href="/fill-up"
+            className="hidden md:inline-flex items-center justify-center rounded-lg bg-emerald-600 md:hover:bg-emerald-700 md:px-4 md:py-2 transition-colors"
+            title="Find a stop"
+          >
+            <span className="text-sm font-medium">📍 Find a stop</span>
+          </a>
           <a
             href="/trip"
             className="hidden md:inline-flex items-center justify-center rounded-lg bg-emerald-600 md:hover:bg-emerald-700 md:px-4 md:py-2 transition-colors"
-            title="Trip Planner"
+            title="Plan a trip"
           >
-            <span className="text-sm font-medium">🚗 Trip Planner</span>
+            <span className="text-sm font-medium">🚗 Plan a trip</span>
           </a>
 
           {/* Three-dot menu — mobile and desktop */}
@@ -115,23 +141,8 @@ export default function Home() {
                 aria-label="Main menu"
                 className="absolute right-0 top-full mt-1 w-60 bg-slate-700 rounded-lg shadow-lg overflow-hidden z-[1100]"
               >
-                <a
-                  role="menuitem"
-                  href="/fill-up"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600"
-                >
-                  <span aria-hidden="true">📍</span> Where should I fill up?
-                </a>
-                <a
-                  role="menuitem"
-                  href="/trip"
-                  className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:bg-slate-600 md:hidden"
-                >
-                  <span aria-hidden="true">🚗</span> Trip Planner
-                </a>
-
                 {/* — Excise section — */}
-                <div className="border-t border-slate-600" role="none">
+                <div role="none">
                   <ExciseToggle
                     mode={exciseMode}
                     onToggle={handleToggleExcise}
