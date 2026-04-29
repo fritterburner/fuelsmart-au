@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { FuelCode, VehicleProfile } from "@/lib/types";
-import { FUEL_TYPES, FUEL_FALLBACKS } from "@/lib/fuel-codes";
+import { FUEL_FALLBACKS } from "@/lib/fuel-codes";
 import { loadVehicles, saveVehicle, deleteVehicle } from "@/lib/vehicles";
 import { isInNorthernTerritory } from "@/lib/nt-bounds";
 import LocationInput from "./LocationInput";
+import VehicleSection from "./trip-form/VehicleSection";
+import AdvancedSettings from "./trip-form/AdvancedSettings";
 
 interface TripFormData {
   originQuery: string;
@@ -82,12 +84,12 @@ export default function TripForm({ onSubmit, loading }: Props) {
     }
   }
 
-  function handleSaveVehicle() {
-    const name = window.prompt("Vehicle name (e.g. Hilux, Camry):");
-    if (!name?.trim()) return;
+  // Name comes in from VehicleSection's inline naming form — no more
+  // window.prompt. The component validates non-empty before calling.
+  function handleSaveVehicle(name: string) {
     const profile: VehicleProfile = {
       id: crypto.randomUUID(),
-      name: name.trim(),
+      name,
       fuel: form.fuel,
       tankSize: form.tank,
       consumption: form.consumption,
@@ -98,11 +100,10 @@ export default function TripForm({ onSubmit, loading }: Props) {
     setSelectedVehicleId(profile.id);
   }
 
+  // Confirmation handled inline by VehicleSection — by the time this fires,
+  // the user has clicked through "Yes, delete".
   function handleDeleteVehicle() {
     if (!selectedVehicleId) return;
-    const v = vehicles.find((veh) => veh.id === selectedVehicleId);
-    if (!v) return;
-    if (!window.confirm(`Delete "${v.name}"?`)) return;
     const updated = deleteVehicle(selectedVehicleId);
     setVehicles(updated);
     setSelectedVehicleId("");
@@ -237,8 +238,6 @@ export default function TripForm({ onSubmit, loading }: Props) {
     // Clear confirmed coords when user edits text
     setViaCoords((v) => v.map((c, i) => (i === index ? null : c)));
   };
-
-  const startingLitres = Math.round(form.startingFuelPct / 100 * form.tank);
 
   // Show the LAF/OPAL toggle only when (a) the chosen fuel has fallbacks and
   // (b) at least one geocoded coordinate lands inside the NT bounds. Outside
@@ -425,218 +424,44 @@ export default function TripForm({ onSubmit, loading }: Props) {
         </span>
       </label>
 
-      {/* Vehicle profile selector + settings */}
-      <div>
-        <div className="flex items-center gap-2 mb-1 flex-wrap">
-          <label className="text-sm font-medium text-gray-700">Vehicle</label>
-          <select
-            value={selectedVehicleId}
-            onChange={(e) => handleSelectVehicle(e.target.value)}
-            className="flex-1 min-w-[140px] px-2 py-1.5 min-h-[36px] border rounded-lg text-sm bg-white"
-          >
-            <option value="">Custom</option>
-            {vehicles.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name} ({v.tankSize}L, {v.consumption}L/100km)
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            onClick={handleSaveVehicle}
-            className="px-2.5 py-1.5 min-h-[36px] text-xs font-medium text-emerald-700 border border-emerald-300 rounded-lg hover:bg-emerald-50 active:bg-emerald-100 transition-colors whitespace-nowrap"
-          >
-            Remember on this device
-          </button>
-          {selectedVehicleId && (
-            <button
-              type="button"
-              onClick={handleDeleteVehicle}
-              className="px-2.5 py-1.5 min-h-[36px] text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 active:bg-red-100 transition-colors"
-            >
-              Delete
-            </button>
-          )}
-        </div>
-        <p className="text-xs text-gray-500 mb-2">
-          Saved to your browser — not synced across devices.
-        </p>
+      <VehicleSection
+        fuel={form.fuel}
+        tank={form.tank}
+        consumption={form.consumption}
+        jerry={form.jerry}
+        hasJerryCans={form.hasJerryCans}
+        onFuelChange={(v) => setVehicleField("fuel", v)}
+        onTankChange={(v) => setVehicleField("tank", v)}
+        onConsumptionChange={(v) => setVehicleField("consumption", v)}
+        onJerryChange={(v) => setVehicleField("jerry", v)}
+        onJerryToggle={(checked) => {
+          setSelectedVehicleId("");
+          setForm((f) => ({
+            ...f,
+            hasJerryCans: checked,
+            jerry: checked ? (f.jerry > 0 ? f.jerry : DEFAULT_JERRY_LITRES) : 0,
+          }));
+        }}
+        vehicles={vehicles}
+        selectedVehicleId={selectedVehicleId}
+        onSelectVehicle={handleSelectVehicle}
+        onSaveVehicle={handleSaveVehicle}
+        onDeleteVehicle={handleDeleteVehicle}
+      />
 
-        {/* Vehicle settings — 2x2 on mobile, 3-col on md+ (jerry cans moved below) */}
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Fuel Type</label>
-            <select
-              value={form.fuel}
-              onChange={(e) => setVehicleField("fuel", e.target.value)}
-              className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base bg-white"
-            >
-              {FUEL_TYPES.map((f) => <option key={f.code} value={f.code}>{f.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tank (L)</label>
-            <input
-              type="number"
-              value={form.tank}
-              onChange={(e) => setVehicleField("tank", Number(e.target.value))}
-              className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
-              min={10}
-              max={200}
-              required
-            />
-          </div>
-          <div className="col-span-2 md:col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">L/100km</label>
-            <input
-              type="number"
-              value={form.consumption}
-              onChange={(e) => setVehicleField("consumption", Number(e.target.value))}
-              step={0.1}
-              className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
-              min={3}
-              max={30}
-              required
-            />
-          </div>
-        </div>
-
-        {/* Jerry cans — opt-in tickbox, litres input only when carrying */}
-        <div className="mt-3">
-          <label className="inline-flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={form.hasJerryCans}
-              onChange={(e) => {
-                const checked = e.target.checked;
-                setSelectedVehicleId("");
-                setForm((f) => ({
-                  ...f,
-                  hasJerryCans: checked,
-                  jerry: checked ? (f.jerry > 0 ? f.jerry : DEFAULT_JERRY_LITRES) : 0,
-                }));
-              }}
-              className="w-5 h-5 accent-emerald-600"
-            />
-            <span className="text-sm text-gray-700">I&apos;m carrying jerry cans</span>
-          </label>
-          {form.hasJerryCans && (
-            <div className="mt-2 flex items-center gap-2 max-w-xs">
-              <label htmlFor="jerry-litres" className="text-sm text-gray-700 whitespace-nowrap">
-                Capacity (L)
-              </label>
-              <input
-                id="jerry-litres"
-                type="number"
-                value={form.jerry}
-                onChange={(e) => setVehicleField("jerry", Number(e.target.value))}
-                className="w-24 px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
-                min={0}
-                max={200}
-                placeholder={String(DEFAULT_JERRY_LITRES)}
-              />
-              <span className="text-xs text-gray-500">standard jerry can ≈ 20L</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Advanced settings — collapsed by default to keep the first-time
-          form short. Power users open it for fine control. */}
-      <details className="group rounded-lg border border-gray-200 bg-gray-50">
-        <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-100 active:bg-gray-100 rounded-lg flex items-center justify-between">
-          <span>Advanced settings</span>
-          <span className="text-xs text-gray-500 group-open:hidden">
-            starting fuel, reserve, full-tank, fallback fuel
-          </span>
-        </summary>
-        <div className="px-3 pb-3 pt-2 space-y-4 border-t border-gray-200">
-          {/* Starting Fuel Level slider */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Starting fuel level
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min={0}
-                max={100}
-                step={5}
-                value={form.startingFuelPct}
-                onChange={(e) => set("startingFuelPct", Number(e.target.value))}
-                className="flex-1 min-h-[44px] accent-emerald-600"
-              />
-              <span className="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[110px] text-right">
-                {form.startingFuelPct}% ({startingLitres}L of {form.tank}L)
-              </span>
-            </div>
-          </div>
-
-          {/* Arrive with full tank toggle */}
-          <label className="flex items-center gap-3 cursor-pointer">
-            <div className="relative">
-              <input
-                type="checkbox"
-                checked={form.arriveFull}
-                onChange={(e) => set("arriveFull", e.target.checked)}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-emerald-500 transition-colors" />
-              <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform" />
-            </div>
-            <span className="text-sm text-gray-700">
-              Arrive with full tank (stock up at cheapest stops)
-            </span>
-          </label>
-
-          {/* Fuel reserve threshold slider */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Minimum fuel reserve
-            </label>
-            <div className="flex items-center gap-3">
-              <input
-                type="range"
-                min={0}
-                max={30}
-                step={5}
-                value={form.reservePct}
-                onChange={(e) => set("reservePct", Number(e.target.value))}
-                className="flex-1 min-h-[44px] accent-emerald-600"
-              />
-              <span className="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[110px] text-right">
-                {form.reservePct}% ({Math.round(form.reservePct / 100 * form.tank)}L of {form.tank}L)
-              </span>
-            </div>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Never arrive at a stop with less than this in the tank
-            </p>
-          </div>
-
-          {/* LAF/OPAL fallback toggle — only relevant when route touches NT
-              and the chosen fuel has a fallback chain. Outside NT it's noise. */}
-          {showFallbackToggle && (
-            <label className="flex items-center gap-3 cursor-pointer">
-              <div className="relative">
-                <input
-                  type="checkbox"
-                  checked={form.allowFallback}
-                  onChange={(e) => set("allowFallback", e.target.checked)}
-                  className="sr-only peer"
-                />
-                <div className="w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-emerald-500 transition-colors" />
-                <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform" />
-              </div>
-              <span className="text-sm text-gray-700">
-                Use Low Aromatic / OPAL fuel where {FUEL_TYPES.find(f => f.code === form.fuel)?.name || form.fuel} unavailable
-                <span className="block text-xs text-gray-500">
-                  Remote NT communities sell unleaded as LAF/OPAL — same engine.
-                </span>
-              </span>
-            </label>
-          )}
-        </div>
-      </details>
+      <AdvancedSettings
+        startingFuelPct={form.startingFuelPct}
+        arriveFull={form.arriveFull}
+        reservePct={form.reservePct}
+        allowFallback={form.allowFallback}
+        tank={form.tank}
+        fuel={form.fuel}
+        showFallbackToggle={showFallbackToggle}
+        onStartingFuelChange={(v) => set("startingFuelPct", v)}
+        onArriveFullChange={(v) => set("arriveFull", v)}
+        onReserveChange={(v) => set("reservePct", v)}
+        onAllowFallbackChange={(v) => set("allowFallback", v)}
+      />
 
       {error && <p className="text-red-600 text-sm">{error}</p>}
 
