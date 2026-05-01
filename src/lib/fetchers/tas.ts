@@ -69,7 +69,7 @@ export async function fetchTASStations(): Promise<Station[]> {
   for (const p of data.prices) {
     const fuelCode = TAS_FUEL_MAP[p.fueltype];
     if (!fuelCode) continue;
-    if (!isRealisticPrice(p.price)) continue;
+    if (!isRealisticPrice(p.price, fuelCode)) continue;
 
     if (!priceMap.has(p.stationcode)) priceMap.set(p.stationcode, []);
     priceMap.get(p.stationcode)!.push({

@@ -59,7 +59,7 @@ export async function fetchQLDStations(): Promise<Station[]> {
     if (!fuelCode) continue;
 
     const cpl = p.Price / 10; // tenths of cent -> cents/L
-    if (!isRealisticPrice(cpl)) continue; // skip 999.9 sentinels and similar
+    if (!isRealisticPrice(cpl, fuelCode)) continue; // skip 999.9 sentinels and 10× decimal slips
 
     if (!priceMap.has(p.SiteId)) priceMap.set(p.SiteId, []);
     priceMap.get(p.SiteId)!.push({

@@ -70,7 +70,7 @@ export async function fetchWAStations(): Promise<Station[]> {
         });
       }
 
-      if (!isRealisticPrice(item.price)) continue;
+      if (!isRealisticPrice(item.price, fuelCode)) continue;
 
       stationMap.get(key)!.prices.push({
         fuel: fuelCode,

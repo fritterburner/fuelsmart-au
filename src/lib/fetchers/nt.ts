@@ -55,8 +55,8 @@ export async function fetchNTStations(): Promise<Station[]> {
     const prices: StationPrice[] = outlet.AvailableFuels
       .filter((f) =>
         f.isAvailable &&
-        isRealisticPrice(f.Price) &&
-        NT_FUEL_MAP[f.FuelCode],
+        NT_FUEL_MAP[f.FuelCode] &&
+        isRealisticPrice(f.Price, NT_FUEL_MAP[f.FuelCode]),
       )
       .map((f) => ({
         fuel: NT_FUEL_MAP[f.FuelCode],
