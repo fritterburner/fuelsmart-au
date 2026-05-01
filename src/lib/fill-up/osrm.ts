@@ -1,19 +1,23 @@
 /**
- * Thin client for the public OSRM routing server.
+ * Routing client used by the Fill-Up Finder.
  *
- * Used by the Fill-Up Finder (`/api/fill-up`) for both the direct A→B route
- * and the per-candidate A→station→B via-routes that let us cost each detour.
+ * Delegates to the shared `getRoute` facade (OSRM primary, OpenRouteService
+ * fallback) but preserves the historical `osrmRoute` / `OsrmThrottledError`
+ * surface so `/api/fill-up` and the find-best-stop tests don't have to change.
  *
- * No retry / no rate-limit handling — failures bubble up so the caller can
- * return 503 and let the UI decide what to do.
+ * The `overview` option is kept for source-level compatibility but is currently
+ * ignored — `getRoute` always returns full geometry. The wasted bandwidth on
+ * the per-candidate via-routes is negligible at our traffic level.
  */
+
+import { getRoute, RouteThrottledError } from "@/lib/routing/get-route";
 
 export const OSRM_BASE = "https://router.project-osrm.org";
 
 /**
- * Thrown when OSRM returns 429. The public demo server is heavily
- * rate-limited and has no SLA — see https://github.com/Project-OSRM/osrm-backend/wiki/Demo-server.
- * API routes should return 429 with an actionable message when they catch this.
+ * Thrown when every routing provider in the fallback chain refused us
+ * (typically OSRM returned 429 and ORS is unconfigured or also throttled).
+ * Name retained for backwards compatibility — covers the ORS path now too.
  */
 export class OsrmThrottledError extends Error {
   constructor() {
@@ -32,41 +36,28 @@ export interface OsrmResult {
 }
 
 /**
- * Route through `coords` in order. OSRM requires at least 2 points.
- * Coords are [lat, lng] for consistency with the rest of our codebase; this
- * function flips them for the OSRM wire format internally.
+ * Route through `coords` in order. Need ≥2 points, all in [lat, lng] order.
+ *
+ * Throws `OsrmThrottledError` when every provider in the chain is unavailable;
+ * any other failure (no route, malformed response) throws a generic `Error`.
  */
 export async function osrmRoute(
   coords: [number, number][],
-  opts?: { overview?: "full" | "simplified" | "false" },
+  _opts?: { overview?: "full" | "simplified" | "false" },
 ): Promise<OsrmResult> {
   if (coords.length < 2) {
     throw new Error(`osrmRoute: need ≥2 coords, got ${coords.length}`);
   }
-  const overview = opts?.overview ?? "full";
-  const path = coords.map(([lat, lng]) => `${lng},${lat}`).join(";");
-  const url = `${OSRM_BASE}/route/v1/driving/${path}?overview=${overview}&geometries=geojson`;
 
-  const resp = await fetch(url);
-  if (!resp.ok) {
-    if (resp.status === 429) {
-      throw new OsrmThrottledError();
-    }
-    throw new Error(`OSRM HTTP ${resp.status}`);
+  try {
+    const route = await getRoute(coords);
+    return {
+      distanceKm: route.distanceMeters / 1000,
+      durationMin: route.durationSeconds / 60,
+      geometry: route.geometryLatLng,
+    };
+  } catch (e) {
+    if (e instanceof RouteThrottledError) throw new OsrmThrottledError();
+    throw e;
   }
-  const data = await resp.json();
-  if (data.code !== "Ok" || !data.routes?.[0]) {
-    throw new Error(`OSRM no route: ${data.code ?? "unknown"}`);
-  }
-  const route = data.routes[0];
-  const geometry: [number, number][] =
-    overview === "false"
-      ? []
-      : (route.geometry.coordinates as [number, number][]).map(([lng, lat]) => [lat, lng]);
-
-  return {
-    distanceKm: route.distance / 1000,
-    durationMin: route.duration / 60,
-    geometry,
-  };
 }

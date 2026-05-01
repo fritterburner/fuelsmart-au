@@ -4,6 +4,7 @@ import { planTripComparison, haversine } from "@/lib/trip-planner";
 import { FuelCode, DestinationFuelInfo } from "@/lib/types";
 import { FUEL_FALLBACKS } from "@/lib/fuel-codes";
 import { applyToStation, type Discount } from "@/lib/discounts";
+import { getRoute, RouteThrottledError } from "@/lib/routing/get-route";
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -41,60 +42,51 @@ export async function GET(request: NextRequest) {
   const [oLat, oLng] = origin.split(",").map(Number);
   const [dLat, dLng] = dest.split(",").map(Number);
 
-  // Build OSRM waypoints string: origin;via1;via2;...;dest (lng,lat format)
-  const waypoints: string[] = [`${oLng},${oLat}`];
+  // Build the waypoint list as [lat,lng] pairs for the routing facade.
+  const waypoints: [number, number][] = [[oLat, oLng]];
 
   if (via) {
     const viaPairs = via.split("|");
     for (const pair of viaPairs) {
       const [lat, lng] = pair.split(",").map(Number);
-      waypoints.push(`${lng},${lat}`);
+      waypoints.push([lat, lng]);
     }
   }
 
-  waypoints.push(`${dLng},${dLat}`);
+  waypoints.push([dLat, dLng]);
 
   // Return trip: A → V1 → V2 → B becomes A → V1 → V2 → B → V2 → V1 → A
   if (returnTrip) {
-    // Reverse the via points and add origin as final destination
     const viaWaypoints = waypoints.slice(1, -1); // just the via points
     for (let i = viaWaypoints.length - 1; i >= 0; i--) {
       waypoints.push(viaWaypoints[i]);
     }
-    waypoints.push(`${oLng},${oLat}`); // end back at origin
+    waypoints.push([oLat, oLng]); // end back at origin
   }
 
-  const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${waypoints.join(";")}?overview=full&geometries=geojson`;
-  const routeResp = await fetch(osrmUrl);
-  if (routeResp.status === 429) {
+  let routeGeometry: [number, number][];
+  let totalDistance: number;
+  let totalDurationSeconds: number;
+  try {
+    const route = await getRoute(waypoints);
+    routeGeometry = route.geometryLatLng;
+    totalDistance = route.distanceMeters / 1000;
+    totalDurationSeconds = route.durationSeconds;
+  } catch (e) {
+    if (e instanceof RouteThrottledError) {
+      return NextResponse.json(
+        { error: e.message, retryable: true },
+        { status: 503 },
+      );
+    }
+    if ((e as Error).message?.startsWith("OSRM no route")) {
+      return NextResponse.json({ error: "No route found" }, { status: 404 });
+    }
     return NextResponse.json(
-      {
-        error:
-          "The public routing service is temporarily throttling us — try again in a minute or two.",
-        retryable: true,
-      },
-      { status: 429 },
-    );
-  }
-  if (!routeResp.ok) {
-    return NextResponse.json(
-      { error: `Routing service returned HTTP ${routeResp.status}` },
+      { error: `Routing failed: ${(e as Error).message}` },
       { status: 503 },
     );
   }
-  const routeData = await routeResp.json();
-
-  if (routeData.code !== "Ok" || !routeData.routes?.[0]) {
-    return NextResponse.json({ error: "No route found" }, { status: 404 });
-  }
-
-  const route = routeData.routes[0];
-  const routeGeometry: [number, number][] = route.geometry.coordinates.map(
-    ([lng, lat]: [number, number]) => [lat, lng]
-  );
-  const totalDistance = route.distance / 1000;
-  const totalDurationSeconds: number =
-    typeof route.duration === "number" ? route.duration : 0;
 
   // Get stations
   const stations = await getCachedStations();
