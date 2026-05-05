@@ -156,5 +156,7 @@ export async function GET(request: NextRequest) {
 
   comparison.destinationFuel = destinationFuel;
 
+  // planningParams is set by planTripComparison itself.
+
   return NextResponse.json(comparison);
 }

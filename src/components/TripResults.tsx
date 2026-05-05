@@ -2,6 +2,7 @@
 
 import { TripComparison, StrategyResult, TripStrategy } from "@/lib/types";
 import StationNavLinks from "./StationNavLinks";
+import FuelLevelChart from "./FuelLevelChart";
 
 /** "1h 23m" / "47m" / "2h" — abbreviated drive time shown per stop. */
 function formatDrive(seconds: number): string {
@@ -262,6 +263,27 @@ export default function TripResults({
             onSelect={() => setSelectedStrategy(result.strategy)}
           />
         ))}
+      </div>
+
+      {/* Fuel-level chart for the selected strategy. Renders inside its own
+          card so the chart's SVG scales cleanly to the card width. */}
+      <div className="bg-white border border-gray-200 rounded-xl p-3 md:p-4 shadow-sm">
+        <h3 className="text-sm font-medium text-gray-700 mb-2">
+          Fuel level along the route
+        </h3>
+        <FuelLevelChart
+          result={selected}
+          totalDistance={comparison.totalDistance}
+          totalCapacity={comparison.planningParams.totalCapacity}
+          startingFuelLitres={comparison.planningParams.startingFuelLitres}
+          reserveLitres={comparison.planningParams.reserveLitres}
+          destinationFuel={comparison.destinationFuel}
+          color={STRATEGY_COLORS[selectedStrategy].dot}
+        />
+        <p className="text-xs text-gray-500 mt-2">
+          Tap a stop to see details. Dashed segment at the destination is the
+          top-up to brim at the cheapest local price.
+        </p>
       </div>
 
       {/* Selected strategy stops */}

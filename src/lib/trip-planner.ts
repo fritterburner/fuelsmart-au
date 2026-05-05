@@ -606,6 +606,11 @@ export function planTripComparison(params: TripParams): TripComparison {
       buildStrategyResult("cheapest_fill", cheapestFill.stops, cheapestFill.warnings, fuelAtDest(cheapestFill), 0),
       buildStrategyResult("no_planning", noPlanning.stops, noPlanning.warnings, fuelAtDest(noPlanning), 0),
     ],
+    planningParams: {
+      totalCapacity,
+      startingFuelLitres: startingFuel,
+      reserveLitres: reserveLevel,
+    },
   };
 }
 

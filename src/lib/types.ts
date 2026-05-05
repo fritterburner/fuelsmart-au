@@ -97,6 +97,14 @@ export interface TripComparison {
   routeGeometry: [number, number][];
   strategies: StrategyResult[];
   destinationFuel?: DestinationFuelInfo;
+  /** Planning inputs, surfaced so the UI can render fuel-level charts without
+      re-deriving them from the form state. `totalCapacity` (tank + jerry) is
+      the planner's "100%" reference — it's what stops fill to. All in litres. */
+  planningParams: {
+    totalCapacity: number;
+    startingFuelLitres: number;
+    reserveLitres: number;
+  };
 }
 
 export interface VehicleProfile {
