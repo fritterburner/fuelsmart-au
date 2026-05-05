@@ -76,8 +76,10 @@ function StrategyCard({
       )}
       <div className="text-xs text-gray-500 mt-0.5 md:mt-1 hidden md:block">{result.description}</div>
 
-      {/* Stats with full labels at every breakpoint — easier to scan than three bare numbers. */}
-      <div className="grid grid-cols-3 gap-2 mt-2 text-xs">
+      {/* Stats with full labels at every breakpoint — easier to scan than four bare numbers.
+          Avg c/L is volume-weighted across the strategy's stops; surfacing it makes
+          source-data outliers (e.g. a 31.7 c/L marina row) visible at a glance. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2 text-xs">
         <div>
           <span className="font-medium text-gray-900">{result.stops.length}</span>
           <span className="text-gray-500"> stop{result.stops.length !== 1 ? "s" : ""}</span>
@@ -86,6 +88,16 @@ function StrategyCard({
           <span className="font-medium text-gray-900">{result.totalLitres.toFixed(0)}L</span>
           <span className="text-gray-500"> fuel</span>
         </div>
+        {result.totalLitres > 0 && Number.isFinite(result.totalFuelCost / result.totalLitres) ? (
+          <div>
+            <span className="font-medium text-gray-900">
+              {((result.totalFuelCost / result.totalLitres) * 100).toFixed(0)} c/L
+            </span>
+            <span className="text-gray-500"> avg</span>
+          </div>
+        ) : (
+          <div />
+        )}
         <div>
           <span className="font-medium text-gray-900">{result.fuelAtDestination.toFixed(0)}L</span>
           <span className="text-gray-500"> arrival</span>

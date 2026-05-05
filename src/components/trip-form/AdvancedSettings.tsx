@@ -64,9 +64,9 @@ export default function AdvancedSettings({
           </div>
         </div>
 
-        {/* Arrive with full tank toggle */}
-        <label className="flex items-center gap-3 cursor-pointer">
-          <div className="relative">
+        {/* Optimised over-buy toggle (internally `arriveFull`) */}
+        <label className="flex items-start gap-3 cursor-pointer">
+          <div className="relative mt-0.5">
             <input
               type="checkbox"
               checked={arriveFull}
@@ -76,8 +76,13 @@ export default function AdvancedSettings({
             <div className="w-11 h-6 bg-gray-300 rounded-full peer-checked:bg-emerald-500 transition-colors" />
             <div className="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow peer-checked:translate-x-5 transition-transform" />
           </div>
-          <span className="text-sm text-gray-700">
-            Arrive with full tank (stock up at cheapest stops)
+          <span className="text-sm text-gray-700 leading-snug">
+            Let Optimised over-buy at cheap stops
+            <span className="block text-xs text-gray-500 mt-0.5">
+              When on, Optimised fills to brim at the cheapest stop even if
+              you&apos;ll arrive with more than you need. The other two
+              strategies always fill to brim regardless.
+            </span>
           </span>
         </label>
 
