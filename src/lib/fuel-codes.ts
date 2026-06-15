@@ -76,3 +76,35 @@ export const NT_BRAND_MAP: Record<string, string> = {
   OR: "On The Run", PM: "Puma Energy", SH: "Shell",
   SO: "Solo", UN: "United",
 };
+
+// --- VIC (Servo Saver) + SA (Informed Sources) — national-coverage additions ---
+
+// Servo Saver returns fuel-type labels; map the ones we support. Confirm the
+// exact label spellings against a live response when the API key is issued.
+export const VIC_FUEL_MAP: Record<string, FuelCode> = {
+  ULP: "U91",
+  Unleaded: "U91",
+  "Unleaded 91": "U91",
+  E10: "E10",
+  "PULP 95": "P95",
+  "Premium 95": "P95",
+  P95: "P95",
+  "PULP 98": "P98",
+  "Premium 98": "P98",
+  P98: "P98",
+  Diesel: "DL",
+  DL: "DL",
+  "Premium Diesel": "PD",
+  PD: "PD",
+  LPG: "LPG",
+  E85: "E85",
+};
+
+// SA is aggregated by Informed Sources — the same operator as QLD — so it uses
+// the same numeric FuelId scheme. Reusing the QLD map is the best-grounded
+// default; confirm on publisher approval.
+export const SA_FUEL_MAP: Record<number, FuelCode> = QLD_FUEL_MAP;
+
+// SA brand-ID -> name. Populate from a live GetFullSiteDetails response on
+// approval; unknown IDs fall back to "Brand <id>" and still render.
+export const SA_BRAND_MAP: Record<number, string> = {};

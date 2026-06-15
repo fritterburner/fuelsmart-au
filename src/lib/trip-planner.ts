@@ -146,6 +146,10 @@ interface RouteStation {
   price: number;
   /** Pump-board cents/L before discount. Equals price when no discount applied. */
   pumpPrice: number;
+  /** One-way detour (km) from the route line to reach this station. */
+  detourKm: number;
+  /** Effective price + amortised detour-fuel surcharge. Ranking only. */
+  rankPrice: number;
   fallbackFuel?: FuelCode; // set when using a fallback fuel type
 }
 
@@ -155,7 +159,9 @@ function prepareRouteStations(
   routeGeometry: [number, number][],
   totalDistance: number,
   allowFallback?: boolean,
-  discounts: Discount[] = []
+  discounts: Discount[] = [],
+  kmPerLitre: number = 0,
+  totalCapacity: number = 0
 ): { all: RouteStation[]; deduped: RouteStation[] } {
   // Reset cumulative distance cache for this route
   _cachedGeometry = null;
@@ -186,6 +192,8 @@ function prepareRouteStations(
         along: pos.along,
         price: eff.effectiveCpl,
         pumpPrice: priceEntry.price,
+        detourKm: pos.perpendicular,
+        rankPrice: detourAdjustedCpl(eff.effectiveCpl, pos.perpendicular, kmPerLitre, totalCapacity),
         fallbackFuel: usedFallback,
       });
     }
@@ -197,7 +205,7 @@ function prepareRouteStations(
   for (const s of routeStations) {
     const existing = deduped.find((d) => Math.abs(d.along - s.along) < 3);
     if (existing) {
-      if (s.price < existing.price) {
+      if (s.rankPrice < existing.rankPrice) {
         deduped[deduped.indexOf(existing)] = s;
       }
     } else {
@@ -298,7 +306,7 @@ function planOptimised(
       continue;
     }
 
-    const cheapest = candidates.reduce((best, s) => (s.price < best.price ? s : best));
+    const cheapest = candidates.reduce((best, s) => (s.rankPrice < best.rankPrice ? s : best));
     const fuelUsedToStop = (cheapest.along - currentKm) / kmPerLitre;
     const fuelOnArrival = currentFuel - fuelUsedToStop;
 
@@ -307,7 +315,7 @@ function planOptimised(
         s.along > cheapest.along + minStopGap &&
         s.along <= cheapest.along + totalCapacity * kmPerLitre
     );
-    const cheaperAhead = futureStations.find((s) => s.price < cheapest.price * 0.95);
+    const cheaperAhead = futureStations.find((s) => s.rankPrice < cheapest.rankPrice * 0.95);
 
     let litresAdded: number;
     if (cheaperAhead) {
@@ -408,7 +416,7 @@ function planCheapestFill(
       break;
     }
 
-    const cheapest = candidates.reduce((best, s) => (s.price < best.price ? s : best));
+    const cheapest = candidates.reduce((best, s) => (s.rankPrice < best.rankPrice ? s : best));
     const fuelUsedToStop = (cheapest.along - currentKm) / kmPerLitre;
     const fuelOnArrival = currentFuel - fuelUsedToStop;
     const litresAdded = totalCapacity - fuelOnArrival;
@@ -535,7 +543,7 @@ export function planTripComparison(params: TripParams): TripComparison {
   const kmPerLitre = 100 / consumption;
   const startingFuel = totalCapacity * (startingFuelPct / 100);
 
-  const { deduped } = prepareRouteStations(stations, fuel, routeGeometry, totalDistance, params.allowFallback, params.discounts ?? []);
+  const { deduped } = prepareRouteStations(stations, fuel, routeGeometry, totalDistance, params.allowFallback, params.discounts ?? [], kmPerLitre, totalCapacity);
 
   // Detect coverage gaps — warn if large sections of route have no stations
   const coverageWarnings: string[] = [];
@@ -629,4 +637,26 @@ export function planTrip(params: TripParams): TripPlan {
     routeGeometry: comparison.routeGeometry,
     warnings: opt.warnings,
   };
+}
+
+// ─── Detour-aware ranking ────────────────────────────────────────────────────
+
+/**
+ * Fold the cost of a detour into a station's *ranking* price. A station off the
+ * route burns extra fuel to reach and return to the line (~2x the perpendicular
+ * offset). We amortise that fuel cost over a tankful to express it as a c/L
+ * surcharge, so a cheaper-but-distant servo only wins when the saving actually
+ * beats the detour. Ranking-only: litres bought are still charged at the real
+ * (effective) price.
+ */
+export function detourAdjustedCpl(
+  priceCpl: number,
+  detourKm: number,
+  kmPerLitre: number,
+  amortiseLitres: number
+): number {
+  if (detourKm <= 0 || kmPerLitre <= 0 || amortiseLitres <= 0) return priceCpl;
+  const detourLitres = (2 * detourKm) / kmPerLitre;
+  const detourSurchargeCpl = (detourLitres * priceCpl) / amortiseLitres;
+  return priceCpl + detourSurchargeCpl;
 }

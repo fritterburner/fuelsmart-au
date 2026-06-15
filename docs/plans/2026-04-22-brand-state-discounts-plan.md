@@ -16,24 +16,24 @@
 
 ## 1. Current state — verified in repo
 
-| Area | Today | File |
-|---|---|---|
-| Discount type | `{id, name, type, value, appliesTo: "both"\|"A"\|"B", enabled}` | [src/lib/discounts.ts:7-15](src/lib/discounts.ts) |
-| Map-popup discount | `applyToStation(pumpCpl, discounts)` — stacks enabled `appliesTo:"both"` fixed_cpl + percent_cashback | [src/lib/discounts.ts](src/lib/discounts.ts) |
-| Seed presets | Coles docket, RACQ, Amex, 7-Eleven — all with `appliesTo:"both"`, no brand/state filter | [src/lib/useDiscounts.ts](src/lib/useDiscounts.ts) |
-| Config + calculator UI | One page: lists discounts + runs A/B calculator side-by-side | [src/app/discounts/page.tsx](src/app/discounts/page.tsx) |
-| First-run nudge | Points at `/discounts` | [src/components/DiscountNudge.tsx](src/components/DiscountNudge.tsx) |
-| Station brand field | `Station.brand: string` (non-empty, sometimes raw retailer) — `Station.state` is one of `NSW\|QLD\|NT\|WA\|TAS` (no SA/VIC/ACT) | [src/lib/types.ts](src/lib/types.ts) |
+| Area                   | Today                                                                                                                           | File                                                                 |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Discount type          | `{id, name, type, value, appliesTo: "both"\|"A"\|"B", enabled}`                                                                 | [src/lib/discounts.ts:7-15](src/lib/discounts.ts)                    |
+| Map-popup discount     | `applyToStation(pumpCpl, discounts)` — stacks enabled `appliesTo:"both"` fixed_cpl + percent_cashback                           | [src/lib/discounts.ts](src/lib/discounts.ts)                         |
+| Seed presets           | Coles docket, RACQ, Amex, 7-Eleven — all with `appliesTo:"both"`, no brand/state filter                                         | [src/lib/useDiscounts.ts](src/lib/useDiscounts.ts)                   |
+| Config + calculator UI | One page: lists discounts + runs A/B calculator side-by-side                                                                    | [src/app/discounts/page.tsx](src/app/discounts/page.tsx)             |
+| First-run nudge        | Points at `/discounts`                                                                                                          | [src/components/DiscountNudge.tsx](src/components/DiscountNudge.tsx) |
+| Station brand field    | `Station.brand: string` (non-empty, sometimes raw retailer) — `Station.state` is one of `NSW\|QLD\|NT\|WA\|TAS` (no SA/VIC/ACT) | [src/lib/types.ts](src/lib/types.ts)                                 |
 
 ### Fetcher brand shapes (the ugly part)
 
-| State | Brand comes from | Shape |
-|---|---|---|
-| QLD | `QLD_BRAND_MAP[site.B]` — curated 20-entry numeric map | Canonical names ("Shell", "BP", "7-Eleven") |
-| NT | `NT_BRAND_MAP[brandCode]` — curated 22-entry code map | Canonical names ("United", "AMPOL", "Shell") |
-| NSW | `station.brand` from FuelCheck NSW API | **Free-form string** — whatever NSW emits |
-| TAS | `station.brand` from FuelCheck TAS API | **Free-form string** — probably same format as NSW |
-| WA | `item.brand` from FuelWatch WA | **Free-form string** |
+| State | Brand comes from                                       | Shape                                              |
+| ----- | ------------------------------------------------------ | -------------------------------------------------- |
+| QLD   | `QLD_BRAND_MAP[site.B]` — curated 20-entry numeric map | Canonical names ("Shell", "BP", "7-Eleven")        |
+| NT    | `NT_BRAND_MAP[brandCode]` — curated 22-entry code map  | Canonical names ("United", "AMPOL", "Shell")       |
+| NSW   | `station.brand` from FuelCheck NSW API                 | **Free-form string** — whatever NSW emits          |
+| TAS   | `station.brand` from FuelCheck TAS API                 | **Free-form string** — probably same format as NSW |
+| WA    | `item.brand` from FuelWatch WA                         | **Free-form string**                               |
 
 File references: [src/lib/fetchers/qld.ts:71](src/lib/fetchers/qld.ts), [nt.ts:65](src/lib/fetchers/nt.ts), [nsw.ts:98](src/lib/fetchers/nsw.ts), [tas.ts:93](src/lib/fetchers/tas.ts), [wa.ts:59](src/lib/fetchers/wa.ts).
 
@@ -77,6 +77,7 @@ export function applyToStation(
 ```
 
 Matching condition per discount:
+
 - `d.enabled` is true, AND
 - `d.brands.length === 0 || d.brands.includes(station.brand)`, AND
 - `d.states.length === 0 || d.states.includes(station.state)`
@@ -136,6 +137,7 @@ Normalisation strategy: case-insensitive + alias map. `"COLES EXPRESS"` → `"Co
 ### Discovery step (required before UI work)
 
 Before writing the multi-select, run a one-shot script that:
+
 1. Calls all five fetchers against real APIs,
 2. Tallies the distinct brand strings per state,
 3. Dumps them to `docs/reference/brand-samples-2026-04-22.md` as a checklist.
@@ -180,6 +182,7 @@ New page shape:
 ```
 
 Card edit expands inline with:
+
 - Name (text)
 - Type (select: "c/L off" / "% cashback")
 - Value (number)
@@ -189,17 +192,17 @@ Card edit expands inline with:
 
 ### Seed presets (updated)
 
-| Name | c/L or % | Brands | States |
-|---|---|---|---|
-| Coles shopper docket (4c/L) | 4 c/L | `Coles Express` | (any) |
-| Woolworths Rewards (4c/L) | 4 c/L | `Caltex Woolworths`, `EG Ampol` | (any) |
-| RACQ member (4c/L) | 4 c/L | `Puma Energy`, `Better Choice` | `QLD` |
-| AANT member (4c/L) | 4 c/L | `United` | `NT` |
-| NRMA member (4c/L) | 4 c/L | `Ampol` | `NSW`, `ACT` |
-| RACV member (4c/L) | 4 c/L | `Ampol` | `VIC` |
-| RAA member (4c/L) | 4 c/L | `Ampol` | `SA` |
-| 7-Eleven Fuel Price Lock | 0 c/L | `7-Eleven` | (any) |
-| Amex / card cashback 2% | 2 % | (any) | (any) |
+| Name                        | c/L or % | Brands                          | States       |
+| --------------------------- | -------- | ------------------------------- | ------------ |
+| Coles shopper docket (4c/L) | 4 c/L    | `Coles Express`                 | (any)        |
+| Woolworths Rewards (4c/L)   | 4 c/L    | `Caltex Woolworths`, `EG Ampol` | (any)        |
+| RACQ member (4c/L)          | 4 c/L    | `Puma Energy`, `Better Choice`  | `QLD`        |
+| AANT member (8c/L)          | 8 c/L    | `United`                        | `NT`         |
+| NRMA member (4c/L)          | 4 c/L    | `Ampol`                         | `NSW`, `ACT` |
+| RACV member (4c/L)          | 4 c/L    | `Ampol`                         | `VIC`        |
+| RAA member (4c/L)           | 4 c/L    | `Ampol`                         | `SA`         |
+| 7-Eleven Fuel Price Lock    | 0 c/L    | `7-Eleven`                      | (any)        |
+| Amex / card cashback 2%     | 2 %      | (any)                           | (any)        |
 
 All seed presets ship with `enabled: false` — users opt in per their own memberships. Brand/state values SME-confirmable later.
 
@@ -221,6 +224,7 @@ Four themed commits. Ordered so each is reviewable and leaves the tree in a work
 **Why first:** everything else depends on brand names being comparable.
 
 **Files:**
+
 - Create: `src/lib/brands.ts` (canonical list + `normaliseBrand` + alias map)
 - Create: `src/lib/__tests__/brands.test.ts` (TDD — "Coles Express variants all normalise", "unknown raw returned verbatim")
 - Modify: `src/lib/fetchers/nsw.ts` — normalise before writing
@@ -235,6 +239,7 @@ Four themed commits. Ordered so each is reviewable and leaves the tree in a work
 ### Commit B — Discount type + applyToStation brand/state matching (~1.5h)
 
 **Files:**
+
 - Modify: `src/lib/discounts.ts` — extend `Discount`, update `applyToStation` signature (+station), drop `fixed_rebate` handling, drop `appliesTo` branching.
 - Modify: `src/lib/__tests__/discounts.test.ts` — update existing tests, add:
   - brand filter — matching station
@@ -251,11 +256,13 @@ Four themed commits. Ordered so each is reviewable and leaves the tree in a work
 ### Commit C — `/discounts` page rebuild, drop A/B calculator (~3h)
 
 **Files:**
+
 - Rewrite: `src/app/discounts/page.tsx` — config-only card list with inline edit, multi-selects for brands + states.
 - Modify: `src/lib/useDiscounts.ts` — update `SEED_DISCOUNTS` with realistic per-chain/per-state presets from §4.
 - Modify: `src/components/DiscountNudge.tsx` — copy tweak ("Set up your loyalty cards, memberships, and cashback rules").
 
 **Verify:**
+
 - Dev server. Pick a discount, edit it, confirm save to localStorage. Navigate back to map. Click a station matching the brand/state — popup shows effective price. Click a station that doesn't match — popup shows rack only.
 - Delete a seed discount, add a new custom one with a brand+state combo.
 - Axe audit this page specifically (most new UI surface).
@@ -267,6 +274,7 @@ Four themed commits. Ordered so each is reviewable and leaves the tree in a work
 ### Commit D — optional polish (~0.5h)
 
 Small cleanups that make sense post-rebuild:
+
 - Home page menu entry: rename "Cashback vs detour" → "Discounts" (was the old A/B framing).
 - Footer / about copy if any references the A/B tool.
 
@@ -276,14 +284,14 @@ Small cleanups that make sense post-rebuild:
 
 ## 6. Estimated effort
 
-| Commit | Scope | Effort |
-|---|---|---|
-| Discovery script + brand sample dump | One-shot fetcher run | ~45m |
-| A. Brand taxonomy + fetcher normalisation | New module + 3 fetcher edits + TDD | ~2h |
-| B. Discount type + applyToStation | Type extension + 4 new tests + 1 callsite | ~1.5h |
-| C. `/discounts` rebuild | Config-only UI + seed presets + nudge copy | ~3h |
-| D. Menu rename polish | 1 file edit | ~0.5h |
-| **Total** | | **~7.5–8h** |
+| Commit                                    | Scope                                      | Effort      |
+| ----------------------------------------- | ------------------------------------------ | ----------- |
+| Discovery script + brand sample dump      | One-shot fetcher run                       | ~45m        |
+| A. Brand taxonomy + fetcher normalisation | New module + 3 fetcher edits + TDD         | ~2h         |
+| B. Discount type + applyToStation         | Type extension + 4 new tests + 1 callsite  | ~1.5h       |
+| C. `/discounts` rebuild                   | Config-only UI + seed presets + nudge copy | ~3h         |
+| D. Menu rename polish                     | 1 file edit                                | ~0.5h       |
+| **Total**                                 |                                            | **~7.5–8h** |
 
 ---
 
@@ -291,23 +299,29 @@ Small cleanups that make sense post-rebuild:
 
 Same spirit as the UX plan — not in this plan's scope:
 
-| Item | Why deferred |
-|---|---|
-| **SA / VIC / ACT station coverage** | Data problem, not UX. Canonical-brand presets include them (RACV, RAA, NRMA ACT) so they'll work the moment fetchers land. Separate design doc. |
-| **Brand logos beside station names** | Once brand is canonical this becomes trivial, but IP-safe logo sourcing is a day's work on its own. |
-| **Loyalty-point accrual** (Woolies earn points, not c/L) | Different mental model — "save" ≠ "earn". Out of scope. |
-| **Auto-detect user's home state + surface state presets first** | Nice-to-have. Do after we see how users actually configure. |
-| **Shareable discount profiles** ("Email me my discount setup" / QR) | Future-cycle. |
+| Item                                                                | Why deferred                                                                                                                                    |
+| ------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SA / VIC / ACT station coverage**                                 | Data problem, not UX. Canonical-brand presets include them (RACV, RAA, NRMA ACT) so they'll work the moment fetchers land. Separate design doc. |
+| **Brand logos beside station names**                                | Once brand is canonical this becomes trivial, but IP-safe logo sourcing is a day's work on its own.                                             |
+| **Loyalty-point accrual** (Woolies earn points, not c/L)            | Different mental model — "save" ≠ "earn". Out of scope.                                                                                         |
+| **Auto-detect user's home state + surface state presets first**     | Nice-to-have. Do after we see how users actually configure.                                                                                     |
+| **Shareable discount profiles** ("Email me my discount setup" / QR) | Future-cycle.                                                                                                                                   |
 
 ---
 
 ## 8. Open questions
 
 1. **Fetcher brand discovery — who runs it?** The discovery script needs `QLD_FPD_API_TOKEN` + working NT source (which is currently upstream-offline per prior commit). If we run it now we miss NT brand data. Options: (a) run partial, backfill NT when their site is back; (b) wait. User to decide when to approve Commit A.
+   
+   1. ANSWER - A
 
 2. **Which Woolies partner is current?** Woolworths Rewards fuel discount has historically been at Caltex/Woolworths co-branded stations, then EG Ampol. Need to confirm the 2026 arrangement before shipping seed presets. SME question.
+   
+   1. EG Ampol but could allow the user to override the seeded preset?
 
 3. **Do we surface per-state auto club presets, or let users add them manually?** Plan §4 lists RACQ/NRMA/RACV/RAA/AANT. But some users may not drive outside their home state — showing them 6 club presets they don't care about is noise. Alternative: one generic "Auto club member (4c/L)" with the user picking their state. Leaning toward the explicit list (clearer) but user's call.
+   
+   1. Go auto club member, pick state, and then apply the discount (allow for override if seed is incorrect) and on what station/s/chains
 
 ---
 

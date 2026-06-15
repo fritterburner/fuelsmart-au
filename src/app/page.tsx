@@ -12,6 +12,7 @@ import { FuelCode } from "@/lib/types";
 import { FUEL_TYPES } from "@/lib/fuel-codes";
 import { loadSettings, saveSettings } from "@/lib/settings";
 import { useMarketData } from "@/lib/useMarketData";
+import { EXCISE_ENABLED } from "@/lib/features";
 
 // Leaflet must be loaded client-side only (no SSR)
 const MapView = dynamic(() => import("@/components/MapView"), { ssr: false });
@@ -28,9 +29,12 @@ export default function Home() {
 
   // Hydrate excise-mode + palette preference from localStorage
   useEffect(() => {
-    const s = loadSettings();
-    setExciseMode(s.exciseMode);
-    setCheapestHighlightCount(s.cheapestHighlightCount);
+    function hydrate() {
+      const s = loadSettings();
+      setExciseMode(EXCISE_ENABLED && s.exciseMode);
+      setCheapestHighlightCount(s.cheapestHighlightCount);
+    }
+    hydrate();
   }, []);
 
   // Live oil + AUD via /api/market-data (only fetch when excise mode is on)
@@ -126,17 +130,25 @@ export default function Home() {
               onToggle={handleToggleExcise}
               variant="mobile-menu"
             />
-            <a
+            {EXCISE_ENABLED && (
+<a
               href="/excise"
               className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
             >
               <span aria-hidden="true">📘</span> How excise is calculated
             </a>
+)}
             <a
               href="/compare"
               className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
             >
               <span aria-hidden="true">🚙</span> Compare running costs
+            </a>
+            <a
+              href="/history"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
+            >
+              <span aria-hidden="true">📈</span> 30-day price history
             </a>
             <a
               href="/additives"
@@ -261,13 +273,15 @@ export default function Home() {
                       variant="mobile-menu"
                     />
                   </div>
-                  <a
+                  {EXCISE_ENABLED && (
+<a
                     role="menuitem"
                     href="/excise"
                     className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
                   >
                     <span aria-hidden="true">📘</span> How excise is calculated
                   </a>
+)}
 
                   <a
                     role="menuitem"
@@ -275,6 +289,13 @@ export default function Home() {
                     className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors border-t border-slate-600"
                   >
                     <span aria-hidden="true">🚙</span> Compare running costs
+                  </a>
+                  <a
+                    role="menuitem"
+                    href="/history"
+                    className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                  >
+                    <span aria-hidden="true">📈</span> 30-day price history
                   </a>
                   <a
                     role="menuitem"

@@ -17,7 +17,10 @@ export const CANONICAL_BRANDS = [
   "7-Eleven",
   "AM/PM",
   "Ampol",
+  "Apco",
   "Astron",
+  "Costco",
+  "Reddy Express",
   "BP",
   "Better Choice",
   "Budget",
@@ -131,6 +134,10 @@ const ALIAS_TO_CANONICAL: Record<string, CanonicalBrand> = {
 
   // Astron
   "ASTRON": "Astron",
+  "APCO": "Apco",
+  "COSTCO": "Costco",
+  "REDDYEXPRESS": "Reddy Express",
+  "SHELLREDDYEXPRESS": "Reddy Express",
 
   // Independent / unbranded catch-all
   "INDEPENDENT": "Independent",

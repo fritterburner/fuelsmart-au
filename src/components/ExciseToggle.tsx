@@ -1,5 +1,7 @@
 "use client";
 
+import { EXCISE_ENABLED } from "@/lib/features";
+
 interface Props {
   mode: boolean;
   onToggle: (next: boolean) => void;
@@ -11,6 +13,7 @@ interface Props {
  * mobile variant is a full-width menu row with an explicit on/off state.
  */
 export default function ExciseToggle({ mode, onToggle, variant }: Props) {
+  if (!EXCISE_ENABLED) return null;
   if (variant === "desktop") {
     return (
       <button

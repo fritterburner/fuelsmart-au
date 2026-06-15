@@ -4,7 +4,10 @@ import { fetchQLDStations } from "./fetchers/qld";
 import { fetchWAStations } from "./fetchers/wa";
 import { fetchNSWStations } from "./fetchers/nsw";
 import { fetchTASStations } from "./fetchers/tas";
+import { fetchVICStations } from "./fetchers/vic";
+import { fetchSAStations } from "./fetchers/sa";
 import { cacheStations, setStateLastUpdate, cacheMarketData } from "./cache";
+import { recordDailySnapshot } from "./history";
 import { fetchLiveMarketData } from "./excise/fetch-market-data";
 
 export async function refreshAllData(): Promise<{
@@ -12,7 +15,10 @@ export async function refreshAllData(): Promise<{
   qld: number;
   wa: number;
   nsw: number;
+  act: number;
   tas: number;
+  vic: number;
+  sa: number;
   total: number;
   errors: string[];
   marketData: { source: string; as_of: string } | { error: string };
@@ -20,16 +26,25 @@ export async function refreshAllData(): Promise<{
   const errors: string[] = [];
   const allStations: Station[] = [];
 
-  // Fetch all sources in parallel
-  const [ntResult, qldResult, waResult, nswResult, tasResult] = await Promise.allSettled([
-    fetchNTStations(),
-    fetchQLDStations(),
-    fetchWAStations(),
-    fetchNSWStations(),
-    fetchTASStations(),
-  ]);
+  // VIC (Servo Saver) and SA (Informed Sources) only run once their access
+  // credentials are configured. Until then they resolve to an empty list so the
+  // cron stays clean and the other states are unaffected.
+  const vicEnabled = !!process.env.VIC_SERVO_SAVER_API_KEY;
+  const saEnabled = !!process.env.SA_FPIS_API_TOKEN;
 
-  let ntCount = 0, qldCount = 0, waCount = 0, nswCount = 0, tasCount = 0;
+  // Fetch all sources in parallel
+  const [ntResult, qldResult, waResult, nswResult, tasResult, vicResult, saResult] =
+    await Promise.allSettled([
+      fetchNTStations(),
+      fetchQLDStations(),
+      fetchWAStations(),
+      fetchNSWStations(),
+      fetchTASStations(),
+      vicEnabled ? fetchVICStations() : Promise.resolve([] as Station[]),
+      saEnabled ? fetchSAStations() : Promise.resolve([] as Station[]),
+    ]);
+
+  let ntCount = 0, qldCount = 0, waCount = 0, nswCount = 0, actCount = 0, tasCount = 0, vicCount = 0, saCount = 0;
 
   if (ntResult.status === "fulfilled") {
     allStations.push(...ntResult.value);
@@ -56,9 +71,14 @@ export async function refreshAllData(): Promise<{
   }
 
   if (nswResult.status === "fulfilled") {
+    // The NSW FuelCheck feed carries both NSW and ACT stations; the fetcher
+    // tags each with its own state. Count and stamp them independently so the
+    // data-freshness page can report ACT honestly.
     allStations.push(...nswResult.value);
-    nswCount = nswResult.value.length;
+    nswCount = nswResult.value.filter((s) => s.state === "NSW").length;
+    actCount = nswResult.value.filter((s) => s.state === "ACT").length;
     if (nswCount > 0) await setStateLastUpdate("NSW");
+    if (actCount > 0) await setStateLastUpdate("ACT");
   } else {
     errors.push(`NSW: ${nswResult.reason}`);
   }
@@ -71,9 +91,34 @@ export async function refreshAllData(): Promise<{
     errors.push(`TAS: ${tasResult.reason}`);
   }
 
+  if (vicResult.status === "fulfilled") {
+    allStations.push(...vicResult.value);
+    vicCount = vicResult.value.length;
+    if (vicCount > 0) await setStateLastUpdate("VIC");
+  } else {
+    errors.push(`VIC: ${vicResult.reason}`);
+  }
+
+  if (saResult.status === "fulfilled") {
+    allStations.push(...saResult.value);
+    saCount = saResult.value.length;
+    if (saCount > 0) await setStateLastUpdate("SA");
+  } else {
+    errors.push(`SA: ${saResult.reason}`);
+  }
+
   // Cache whatever we got (partial success is better than nothing)
   if (allStations.length > 0) {
     await cacheStations(allStations);
+  }
+
+  // Daily price snapshot for 30-day history charts + forecasting (non-fatal).
+  if (allStations.length > 0) {
+    try {
+      await recordDailySnapshot(allStations);
+    } catch (err) {
+      errors.push("History: " + (err instanceof Error ? err.message : String(err)));
+    }
   }
 
   // Refresh market data (Brent crude + AUD/USD) for excise pass-through calcs.
@@ -94,7 +139,10 @@ export async function refreshAllData(): Promise<{
     qld: qldCount,
     wa: waCount,
     nsw: nswCount,
+    act: actCount,
     tas: tasCount,
+    vic: vicCount,
+    sa: saCount,
     total: allStations.length,
     errors,
     marketData,

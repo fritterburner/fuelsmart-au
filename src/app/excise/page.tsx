@@ -1,5 +1,9 @@
 "use client";
 
+import { notFound } from "next/navigation";
+import Link from "next/link";
+import { EXCISE_ENABLED } from "@/lib/features";
+
 import { useMemo } from "react";
 import {
   BASELINE_OIL_USD,
@@ -15,6 +19,7 @@ import { useMarketData, effectiveMarketValues } from "@/lib/useMarketData";
 import ExciseManualOverride from "@/components/ExciseManualOverride";
 
 export default function ExciseExplainerPage() {
+  if (!EXCISE_ENABLED) notFound();
   const { data, loading, error, override, setOverride } = useMarketData(true);
   const effective = effectiveMarketValues(data, override);
 
@@ -35,7 +40,7 @@ export default function ExciseExplainerPage() {
     <div className="min-h-screen bg-gray-50 pb-12">
       {/* Sticky header with back navigation */}
       <div className="sticky top-0 z-30 bg-slate-800 text-white px-3 py-3 flex items-center gap-3 shadow-md">
-        <a
+        <Link
           href="/"
           className="flex items-center justify-center w-10 h-10 min-h-[44px] min-w-[44px] rounded-full hover:bg-slate-700 active:bg-slate-600 transition-colors text-emerald-400"
           aria-label="Back to map"
@@ -43,7 +48,7 @@ export default function ExciseExplainerPage() {
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
             <path fillRule="evenodd" d="M17 10a.75.75 0 01-.75.75H5.612l4.158 3.96a.75.75 0 11-1.04 1.08l-5.5-5.25a.75.75 0 010-1.08l5.5-5.25a.75.75 0 111.04 1.08L5.612 9.25H16.25A.75.75 0 0117 10z" clipRule="evenodd" />
           </svg>
-        </a>
+        </Link>
         <h1 className="font-bold text-lg">How excise is calculated</h1>
       </div>
 
@@ -119,7 +124,7 @@ export default function ExciseExplainerPage() {
           <h2 className="text-xl font-bold text-gray-900 mb-2">The formula</h2>
           <div className="rounded-lg bg-gray-900 text-gray-100 text-xs font-mono p-4 overflow-x-auto">
             <div>oil_change_pct = (live_oil − {BASELINE_OIL_USD.toFixed(2)}) / {BASELINE_OIL_USD.toFixed(2)} × 100</div>
-            <div>oil_impact = oil_change_pct × crude_ratio  <span className="text-gray-400">// ULP {CRUDE_RATIO.ULP}, Diesel {CRUDE_RATIO.DIESEL}</span></div>
+            <div>oil_impact = oil_change_pct × crude_ratio  <span className="text-gray-400">{"// "}ULP {CRUDE_RATIO.ULP}, Diesel {CRUDE_RATIO.DIESEL}</span></div>
             <div>fx_change_pct = ({BASELINE_AUD_USD.toFixed(4)} − live_aud) / {BASELINE_AUD_USD.toFixed(4)} × 100</div>
             <div>fx_impact = fx_change_pct × {FX_RATIO}</div>
             <div>expected = city_baseline − {EXCISE_CUT_CPL.toFixed(1)} + oil_impact + fx_impact</div>

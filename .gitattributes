@@ -1,0 +1,5 @@
+# Normalise line endings so the working tree stops showing whole-file CRLF/LF
+# churn in diffs. After adding this, run once:
+#   git add --renormalize .
+#   git commit -m "Normalise line endings"
+* text=auto eol=lf

@@ -24,6 +24,14 @@ const STATES: StateEntry[] = [
       "Retailers are legally required to report price changes within 30 minutes under the Fuel Check Act 2016. Most pins update within an hour of a pump change.",
   },
   {
+    code: "ACT",
+    label: "Australian Capital Territory",
+    source: "FuelCheck NSW/ACT",
+    cadence: "Near real-time",
+    detail:
+      "The ACT joined the NSW FuelCheck scheme in 2022 and shares its feed. Retailers report price changes within 30 minutes, so Canberra pins update on the same near real-time basis as NSW.",
+  },
+  {
     code: "QLD",
     label: "Queensland",
     source: "Fuel Price Reporting",
@@ -56,12 +64,12 @@ const STATES: StateEntry[] = [
       "Similar self-report model to NT. Updates are generally prompt but not legally enforced on a fixed cadence.",
   },
   {
-    code: "SA / VIC / ACT",
-    label: "South Australia, Victoria, ACT",
-    source: "No unified public feed",
-    cadence: "Not covered",
+    code: "SA / VIC",
+    label: "South Australia, Victoria",
+    source: "Integration in progress",
+    cadence: "Coming soon",
     detail:
-      "These states either don't run a public price-reporting scheme or expose one we can aggregate yet. The map will be empty through these regions — we'd rather show nothing than show stale guesses.",
+      "Both now run official price-reporting schemes we're connecting to: Victoria's Servo Saver Open API (24-hour delayed tier) and South Australia's Fuel Pricing Information Scheme. Until those feeds are live, the map stays empty through these regions — we'd rather show nothing than stale guesses.",
   },
 ];
 
@@ -147,10 +155,12 @@ export default function DataFreshnessPage() {
             Why some regions show as empty
           </h2>
           <p className="text-xs text-amber-900 leading-relaxed">
-            SA, VIC and ACT don&apos;t publish a feed we can plug into yet.
-            Rather than fake it with guesses or out-of-date data, the map shows
-            no pins through these regions. If you plan a trip that passes
-            through them, the Trip Planner will warn you before routing.
+            SA and VIC feeds aren&apos;t live in the app yet, so the map shows no
+            pins through those two states for now. Rather than fake it with
+            guesses or out-of-date data, we show nothing until the official feeds
+            are connected. If you plan a trip that passes through them, the Trip
+            Planner will warn you before routing. (ACT is covered — it shares the
+            NSW FuelCheck feed.)
           </p>
         </section>
 
@@ -163,7 +173,7 @@ export default function DataFreshnessPage() {
               target="_blank"
               rel="noopener noreferrer"
             >
-              FuelCheck NSW
+              FuelCheck NSW &amp; ACT
             </a>
             ,{" "}
             <a

@@ -44,6 +44,18 @@ function parseNSWDate(dateStr: string): string {
   return parseLocalDateToISO(dateStr, "Australia/Sydney");
 }
 
+/**
+ * ACT postcodes are interleaved with NSW border postcodes, but these ranges
+ * are unambiguously ACT. Used as a safety net so ACT stations classify as ACT
+ * even if the address state token is missing or wrong. (2620 is shared with
+ * Queanbeyan NSW, so it is deliberately excluded.)
+ */
+export function isActPostcode(pc: string): boolean {
+  const n = Number(pc);
+  if (!Number.isFinite(n)) return false;
+  return n === 200 || (n >= 2600 && n <= 2618) || (n >= 2900 && n <= 2920);
+}
+
 export async function fetchNSWStations(): Promise<Station[]> {
   const timestamp = new Date().toLocaleString("en-AU", {
     timeZone: "Australia/Sydney",
@@ -84,10 +96,18 @@ export async function fetchNSWStations(): Promise<Station[]> {
     });
   }
 
-  // Parse suburb/postcode/state from address (format: "123 Street, SUBURB NSW 2000")
-  function parseAddress(address: string): { street: string; suburb: string; state: string; postcode: string } {
+  // Parse suburb/postcode/state from address (format: "123 Street, SUBURB NSW 2000").
+  // ACT rides this same FuelCheck feed; classify ACT vs NSW from the address.
+  function parseAddress(address: string): { street: string; suburb: string; state: "NSW" | "ACT"; postcode: string } {
     const m = address.match(/^(.+?),\s*(.+?)\s+(NSW|ACT)\s+(\d{4})$/);
-    if (m) return { street: m[1], suburb: m[2], state: m[3], postcode: m[4] };
+    if (m) {
+      const postcode = m[4];
+      // Trust an explicit ACT token; otherwise fall back to ACT postcode ranges
+      // so an ACT station whose row reads "NSW" still classifies correctly.
+      const state: "NSW" | "ACT" =
+        m[3] === "ACT" || isActPostcode(postcode) ? "ACT" : "NSW";
+      return { street: m[1], suburb: m[2], state, postcode };
+    }
     return { street: address, suburb: "", state: "NSW", postcode: "" };
   }
 
@@ -102,7 +122,7 @@ export async function fetchNSWStations(): Promise<Station[]> {
         brandCode: station.brandid,
         address: parsed.street,
         suburb: parsed.suburb,
-        state: parsed.state as "NSW" | "ACT",
+        state: parsed.state,
         postcode: parsed.postcode,
         lat: station.location.latitude,
         lng: station.location.longitude,
