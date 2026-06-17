@@ -9,6 +9,7 @@ import { fetchSAStations } from "./fetchers/sa";
 import { cacheStations, setStateLastUpdate, cacheMarketData } from "./cache";
 import { recordDailySnapshot } from "./history";
 import { fetchLiveMarketData } from "./excise/fetch-market-data";
+import { EXCISE_ENABLED } from "./features";
 
 export async function refreshAllData(): Promise<{
   nt: number;
@@ -123,8 +124,8 @@ export async function refreshAllData(): Promise<{
 
   // Refresh market data (Brent crude + AUD/USD) for excise pass-through calcs.
   // Failure here must not kill the station refresh.
-  let marketData: { source: string; as_of: string } | { error: string };
-  try {
+  let marketData: { source: string; as_of: string } | { error: string } = { error: "excise disabled — market data skipped" };
+  if (EXCISE_ENABLED) try {
     const fetched = await fetchLiveMarketData();
     await cacheMarketData(fetched);
     marketData = { source: fetched.source, as_of: fetched.as_of };

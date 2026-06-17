@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { FUEL_TYPES } from "@/lib/fuel-codes";
 import { FuelCode, StateCode } from "@/lib/types";
+import { regionsForState, nearestRegion, regionById } from "@/lib/regions";
 import PriceHistoryChart from "@/components/PriceHistoryChart";
 
 const STATES: StateCode[] = ["NSW", "ACT", "VIC", "QLD", "SA", "WA", "TAS", "NT"];
@@ -39,20 +40,43 @@ const REC_STYLE: Record<string, { label: string; cls: string }> = {
 
 export default function HistoryPage() {
   const [state, setState] = useState<StateCode>("NSW");
+  const [region, setRegion] = useState<string>(""); // "" = whole state
   const [fuel, setFuel] = useState<FuelCode>("U91");
   const [series, setSeries] = useState<StatePoint[]>([]);
   const [forecast, setForecast] = useState<Forecast | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Default to the region nearest the last map centre (persisted by the map).
+  useEffect(() => {
+    function applyMapCentreDefault() {
+      try {
+        const raw = localStorage.getItem("fuelsmart-mappos");
+        if (!raw) return;
+        const pos = JSON.parse(raw);
+        if (typeof pos?.lat !== "number" || typeof pos?.lng !== "number") return;
+        const rid = nearestRegion(pos.lat, pos.lng);
+        const reg = rid ? regionById(rid) : undefined;
+        if (reg) {
+          setState(reg.state);
+          setRegion(reg.id);
+        }
+      } catch {
+        /* ignore — fall back to Whole NSW */
+      }
+    }
+    applyMapCentreDefault();
+  }, []);
 
   useEffect(() => {
     let active = true;
 
     async function load() {
       setLoading(true);
+      const scope = region ? `region/${region}` : `state/${state}`;
       try {
         const [hRes, fRes] = await Promise.all([
-          fetch(`/api/history/state/${state}?fuel=${fuel}&days=30`),
-          fetch(`/api/forecast/state/${state}?fuel=${fuel}`),
+          fetch(`/api/history/${scope}?fuel=${fuel}&days=30`),
+          fetch(`/api/forecast/${scope}?fuel=${fuel}`),
         ]);
         const hData = await hRes.json();
         const fData = await fRes.json();
@@ -74,9 +98,10 @@ export default function HistoryPage() {
     return () => {
       active = false;
     };
-  }, [state, fuel]);
+  }, [state, region, fuel]);
 
   const primaryFuels = FUEL_TYPES.filter((f) => f.primary);
+  const regionOptions = regionsForState(state);
 
   // Combined chart: last ~14 days of history joined to the 7-day projection.
   const recent = series.slice(-14);
@@ -129,7 +154,10 @@ export default function HistoryPage() {
             <button
               key={s}
               type="button"
-              onClick={() => setState(s)}
+              onClick={() => {
+                setState(s);
+                setRegion("");
+              }}
               aria-pressed={state === s}
               className={`min-h-[40px] px-3 rounded-lg border text-sm font-medium transition-colors ${
                 state === s
@@ -140,6 +168,24 @@ export default function HistoryPage() {
               {s}
             </button>
           ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="text-sm text-gray-700">
+            Region:{" "}
+            <select
+              value={region}
+              onChange={(e) => setRegion(e.target.value)}
+              className="min-h-[40px] px-2 rounded-lg border border-slate-300 bg-white text-sm text-slate-900"
+            >
+              <option value="">Whole {state}</option>
+              {regionOptions.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <div className="flex flex-wrap gap-2" role="group" aria-label="Fuel type">
@@ -183,9 +229,7 @@ export default function HistoryPage() {
                   <span className={`inline-flex items-center px-2.5 py-1 rounded-full border text-sm font-semibold ${rec.cls}`}>
                     {rec.label}
                   </span>
-                  <span className="text-xs text-gray-500">
-                    forecast confidence: {forecast.confidence}
-                  </span>
+                  <span className="text-xs text-gray-500">forecast confidence: {forecast.confidence}</span>
                 </div>
                 <p className="text-sm text-gray-700">{forecast.rationale}</p>
                 {forecast.events.length > 0 && (
@@ -207,9 +251,10 @@ export default function HistoryPage() {
         )}
 
         <p className="text-xs text-gray-500 leading-relaxed">
-          Daily snapshots come from the live state feeds. The outlook blends the
-          recent price cycle with known policy events (like excise changes); it
-          sharpens as more history accrues.
+          Daily snapshots come from the live state feeds. Pick a region for a
+          sharper read — metro and country prices move differently. The outlook
+          blends the recent price cycle with known policy events; it sharpens as
+          more history accrues.
         </p>
       </div>
     </div>

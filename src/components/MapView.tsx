@@ -15,10 +15,13 @@ import type { Discount } from "@/lib/discounts";
 import { useDiscounts, loadDiscounts, saveDiscounts } from "@/lib/useDiscounts";
 import StationExcisePopup from "./StationExcisePopup";
 import StationNavLinks from "./StationNavLinks";
+import StationSparkline from "./StationSparkline";
+import AreaAverageLayer from "./AreaAverageLayer";
+import SaObligations from "./SaObligations";
 import "leaflet/dist/leaflet.css";
 
 // Fix Leaflet default marker icons in Next.js
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
   iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
@@ -321,6 +324,8 @@ function StationPricePopupContent({
         )}
       </div>
 
+      <StationSparkline stationId={station.id} fuel={priceEntry.fuel} />
+      <SaObligations station={station} />
       <StationNavLinks lat={station.lat} lng={station.lng} name={station.name} />
     </div>
   );
@@ -340,6 +345,7 @@ export default function MapView({
   const [fallbackNotice, setFallbackNotice] = useState<string | null>(null);
   const fetchController = useRef<AbortController | null>(null);
   const { discounts: activeDiscounts } = useDiscounts();
+  const [areaMode, setAreaMode] = useState(false);
 
   const fetchStations = useCallback(
     async (bounds: string) => {
@@ -357,8 +363,8 @@ export default function MapView({
         setStations(data.stations || []);
         setActiveFuel(data.activeFuel || fuel);
         setFallbackNotice(data.fallbackNotice || null);
-      } catch (e: any) {
-        if (e.name !== "AbortError") console.error("Failed to fetch stations:", e);
+      } catch (e) {
+        if ((e as { name?: string }).name !== "AbortError") console.error("Failed to fetch stations:", e);
       }
       setLoading(false);
     },
@@ -410,6 +416,7 @@ export default function MapView({
         fuel={fuel}
       />
       <FlyTo center={flyTo} />
+      <AreaAverageLayer enabled={areaMode} stations={stations} fuel={displayFuel} />
       {stations.map((station) => {
         const priceEntry = station.prices.find((p) => p.fuel === displayFuel);
         if (!priceEntry) return null;
@@ -506,6 +513,11 @@ export default function MapView({
         )}
       </div>
       {/* End top-stacked notices */}
+      <div className="absolute bottom-4 left-3 z-[1000] pointer-events-auto">
+        <button type="button" onClick={() => setAreaMode((m) => !m)} aria-pressed={areaMode} className={"inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium shadow-lg transition-colors " + (areaMode ? "bg-emerald-600 text-white" : "bg-white text-slate-800 hover:bg-slate-100")}>
+          <span aria-hidden="true">📍</span> {areaMode ? "Tap the map…" : "Area average"}
+        </button>
+      </div>
     </MapContainer>
   );
 }

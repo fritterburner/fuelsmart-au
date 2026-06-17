@@ -70,3 +70,9 @@ This is the one genuinely new server-side piece, but it's the same category as t
 3. Cadence/staleness presented honestly (feed `as_of` -> pin timestamp).
 4. Rate limits respected by the cron + cache path.
 5. Feed-specific obligations implemented: SA stale-data complaint link; SA usage-counter; SA attribution string.
+
+---
+
+## Derived data — attribution
+
+- **Regional hub selection (ABS):** the named-region scheme (`lib/regions.ts`) chooses its regional hubs from **ABS Significant Urban Areas / population data** (Australian Bureau of Statistics, CC BY 4.0). ABS data is used only to *select and place* the region anchors — we don't redistribute ABS datasets. Suggested credit (footer of `/data-freshness` or `/privacy`): "Region definitions derived from Australian Bureau of Statistics data, © ABS, CC BY 4.0."
