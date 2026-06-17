@@ -22,7 +22,7 @@ export const RANK_COLORS = {
   green: "#22c55e",  // cheapest N
   orange: "#f59e0b", // expensive-ish tail
   red: "#ef4444",    // most expensive
-  gray: "#6b7280",   // middle / not flagged
+  gray: "#475569",   // middle / not flagged
 } as const;
 
 export type RankColor = (typeof RANK_COLORS)[keyof typeof RANK_COLORS];

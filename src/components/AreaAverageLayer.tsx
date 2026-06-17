@@ -64,6 +64,7 @@ export default function AreaAverageLayer({
   return (
     <Circle
       ref={circleRef}
+      eventHandlers={{ click: (e) => setPoint({ lat: e.latlng.lat, lng: e.latlng.lng }) }}
       center={[point.lat, point.lng]}
       radius={RADIUS_KM * 1000}
       pathOptions={{ color: "#0f766e", weight: 1, fillColor: "#0f766e", fillOpacity: 0.08 }}

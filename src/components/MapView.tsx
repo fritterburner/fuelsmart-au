@@ -44,7 +44,7 @@ function createPriceIcon(price: number, color: string, discounted: boolean = fal
   const ring = discounted ? "0 0 0 2px #dc2626," : "";
   return L.divIcon({
     className: "price-marker",
-    html: `<div style="background:${color};color:#fff;padding:3px 8px;border-radius:9px;font:600 12px/1.1 -apple-system,system-ui,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.2px;white-space:nowrap;border:1px solid rgba(0,0,0,.12);box-shadow:${ring}0 1px 4px rgba(0,0,0,.3);">${price.toFixed(1)}</div>`,
+    html: `<div style="display:flex;align-items:center;justify-content:center;width:62px;height:26px;"><span style="background:${color};color:#fff;padding:3px 8px;border-radius:9px;font:600 12px/1.1 -apple-system,system-ui,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.2px;white-space:nowrap;border:1px solid rgba(0,0,0,.12);box-shadow:${ring}0 1px 4px rgba(0,0,0,.3);">${price.toFixed(1)}</span></div>`,
     iconSize: [62, 26],
     iconAnchor: [31, 13],
   });
@@ -53,13 +53,14 @@ function createPriceIcon(price: number, color: string, discounted: boolean = fal
 function createExciseIcon(label: string, color: string): L.DivIcon {
   return L.divIcon({
     className: "price-marker",
-    html: `<div style="background:${color};color:#fff;padding:3px 8px;border-radius:9px;font:600 12px/1.1 -apple-system,system-ui,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.2px;white-space:nowrap;border:1px solid rgba(0,0,0,.12);box-shadow:0 1px 4px rgba(0,0,0,.3);">${label}</div>`,
+    html: `<div style="display:flex;align-items:center;justify-content:center;width:62px;height:26px;"><span style="background:${color};color:#fff;padding:3px 8px;border-radius:9px;font:600 12px/1.1 -apple-system,system-ui,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.2px;white-space:nowrap;border:1px solid rgba(0,0,0,.12);box-shadow:0 1px 4px rgba(0,0,0,.3);">${label}</span></div>`,
     iconSize: [62, 26],
     iconAnchor: [31, 13],
   });
 }
 
 function getBoundsString(
+
 map: L.Map): string {
   const b = map.getBounds();
   return `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
@@ -158,6 +159,17 @@ export function FlyTo({ center }: { center: [number, number] | null }) {
   useEffect(() => {
     if (center) map.flyTo(center, 13);
   }, [center, map]);
+  return null;
+}
+
+function InvalidateOnResize() {
+  // Leaflet measures its container on mount; in a flex layout that can race the
+  // layout and leave grey tiles. Re-measure on the next tick.
+  const map = useMap();
+  useEffect(() => {
+    const t = setTimeout(() => map.invalidateSize(), 0);
+    return () => clearTimeout(t);
+  }, [map]);
   return null;
 }
 
@@ -343,6 +355,7 @@ export default function MapView({
   const fetchController = useRef<AbortController | null>(null);
   const { discounts: activeDiscounts } = useDiscounts();
   const [areaMode, setAreaMode] = useState(false);
+  const [listTarget, setListTarget] = useState<[number, number] | null>(null);
 
   const fetchStations = useCallback(
     async (bounds: string) => {
@@ -402,8 +415,25 @@ export default function MapView({
   const initialCenter: [number, number] = saved ? [saved.lat, saved.lng] : [-25.5, 134.5];
   const initialZoom = saved ? saved.zoom : 5;
 
+  // In-view stations, cheapest first, for the desktop side panel.
+  const listRows = stations
+    .map((s) => {
+      const eff = effectiveById.get(s.id);
+      const color = colorById.get(s.id);
+      const pump = s.prices.find((p) => p.fuel === displayFuel)?.price;
+      if (!eff || !color || pump == null) return null;
+      return { station: s, effectiveCpl: eff.effectiveCpl, hasDiscount: eff.hasDiscount, color, pump };
+    })
+    .filter(
+      (x): x is { station: Station; effectiveCpl: number; hasDiscount: boolean; color: string; pump: number } =>
+        x != null,
+    )
+    .sort((a, b) => a.effectiveCpl - b.effectiveCpl)
+    .slice(0, 100);
+
   return (
-    <MapContainer center={initialCenter} zoom={initialZoom} className="h-full w-full">
+    <div className="relative h-full w-full flex">
+    <MapContainer center={initialCenter} zoom={initialZoom} className="h-full flex-1 min-w-0">
       <TileLayer
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
         url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
@@ -413,6 +443,8 @@ export default function MapView({
         fuel={fuel}
       />
       <FlyTo center={flyTo} />
+      <FlyTo center={listTarget} />
+      <InvalidateOnResize />
       <AreaAverageLayer enabled={areaMode} stations={stations} fuel={displayFuel} />
       {stations.map((station) => {
         const priceEntry = station.prices.find((p) => p.fuel === displayFuel);
@@ -517,5 +549,35 @@ export default function MapView({
         </button>
       </div>
     </MapContainer>
+    <aside className="hidden md:flex md:flex-col w-80 bg-white border-l border-slate-200 overflow-y-auto">
+      <div className="sticky top-0 bg-white border-b border-slate-200 px-3 py-2 text-xs text-slate-500">
+        {listRows.length} stations in view
+        {listRows[0] ? ` \u00b7 cheapest ${listRows[0].effectiveCpl.toFixed(1)} c/L` : ""}
+      </div>
+      <ul>
+        {listRows.map((r) => (
+          <li key={r.station.id}>
+            <button
+              type="button"
+              onClick={() => setListTarget([r.station.lat, r.station.lng])}
+              className="w-full text-left px-3 py-2 border-b border-slate-100 hover:bg-slate-50 flex items-center gap-2"
+            >
+              <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: r.color }} aria-hidden="true" />
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-medium text-slate-800 truncate">{r.station.brand}</span>
+                <span className="block text-xs text-slate-500 truncate">{r.station.suburb || r.station.address}</span>
+              </span>
+              <span className="text-right flex-shrink-0">
+                <span className="block text-sm font-semibold text-slate-900">{r.effectiveCpl.toFixed(1)}</span>
+                {r.hasDiscount && (
+                  <span className="block text-[10px] text-slate-400 line-through">{r.pump.toFixed(1)}</span>
+                )}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </aside>
+    </div>
   );
 }
