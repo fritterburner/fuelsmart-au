@@ -172,20 +172,11 @@ export default function Home() {
         </div>
 
         <footer className="border-t border-slate-700 px-4 py-2 text-[11px] text-slate-400 leading-snug safe-area-bottom">
-          <div>
-            Data: NT Gov, QLD Gov,{" "}
-            <a href="https://www.fuelwatch.wa.gov.au" className="underline" target="_blank" rel="noopener noreferrer">
-              FuelWatch WA
-            </a>
-            ,{" "}
-            <a href="https://www.fuelcheck.nsw.gov.au" className="underline" target="_blank" rel="noopener noreferrer">
-              FuelCheck NSW
-            </a>
-            , FuelCheck TAS
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            <a href="/data-freshness" className="underline hover:text-slate-200">Data sources</a>
+            <a href="/privacy" className="underline hover:text-slate-200">Privacy</a>
+            <a href="/terms" className="underline hover:text-slate-200">Terms</a>
           </div>
-          <a href="/data-freshness" className="underline opacity-80 mt-1 inline-block">
-            Data freshness varies by state →
-          </a>
         </footer>
       </aside>
 
@@ -325,6 +316,12 @@ export default function Home() {
                     className="flex items-center gap-2 px-4 py-3 text-xs text-slate-300 hover:bg-slate-600 active:bg-slate-600 transition-colors border-t border-slate-600"
                   >
                     <span aria-hidden="true">ℹ️</span> Data sources &amp; freshness
+                  </a>
+                  <a role="menuitem" href="/privacy" className="flex items-center gap-2 px-4 py-3 text-xs text-slate-300 hover:bg-slate-600 active:bg-slate-600 transition-colors">
+                    <span aria-hidden="true">🔒</span> Privacy
+                  </a>
+                  <a role="menuitem" href="/terms" className="flex items-center gap-2 px-4 py-3 text-xs text-slate-300 hover:bg-slate-600 active:bg-slate-600 transition-colors">
+                    <span aria-hidden="true">📄</span> Terms
                   </a>
                 </div>
               )}

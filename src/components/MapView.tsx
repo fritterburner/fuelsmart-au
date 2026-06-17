@@ -18,6 +18,7 @@ import StationNavLinks from "./StationNavLinks";
 import StationSparkline from "./StationSparkline";
 import AreaAverageLayer from "./AreaAverageLayer";
 import SaObligations from "./SaObligations";
+import FreshnessChip from "./FreshnessChip";
 import "leaflet/dist/leaflet.css";
 
 // Fix Leaflet default marker icons in Next.js
@@ -39,31 +40,27 @@ const EXCISE_VERDICT_COLOR: Record<Verdict, string> = {
 };
 
 function createPriceIcon(price: number, color: string, discounted: boolean = false): L.DivIcon {
-  // Discounted pins get a red ring via box-shadow so the visual asymmetry
-  // is obvious at a glance: green/red color = rank, red ring = "your saved
-  // discount applies here".
-  const ring = discounted ? "box-shadow:0 0 0 2px #dc2626;" : "";
-  const border = discounted
-    ? "border:1px solid rgba(0,0,0,0.2);"
-    : "border:1px solid rgba(0,0,0,0.2);";
+  // Rank colour = price tier; a red ring marks "your saved discount applies here".
+  const ring = discounted ? "0 0 0 2px #dc2626," : "";
   return L.divIcon({
     className: "price-marker",
-    html: `<div style="background:${color};color:white;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;white-space:nowrap;${border}${ring}text-align:center;">${price.toFixed(1)}</div>`,
-    iconSize: [60, 24],
-    iconAnchor: [30, 12],
+    html: `<div style="background:${color};color:#fff;padding:3px 8px;border-radius:9px;font:600 12px/1.1 -apple-system,system-ui,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.2px;white-space:nowrap;border:1px solid rgba(0,0,0,.12);box-shadow:${ring}0 1px 4px rgba(0,0,0,.3);">${price.toFixed(1)}</div>`,
+    iconSize: [62, 26],
+    iconAnchor: [31, 13],
   });
 }
 
 function createExciseIcon(label: string, color: string): L.DivIcon {
   return L.divIcon({
     className: "price-marker",
-    html: `<div style="background:${color};color:white;padding:2px 6px;border-radius:4px;font-size:12px;font-weight:bold;white-space:nowrap;border:1px solid rgba(0,0,0,0.2);text-align:center;">${label}</div>`,
-    iconSize: [60, 24],
-    iconAnchor: [30, 12],
+    html: `<div style="background:${color};color:#fff;padding:3px 8px;border-radius:9px;font:600 12px/1.1 -apple-system,system-ui,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.2px;white-space:nowrap;border:1px solid rgba(0,0,0,.12);box-shadow:0 1px 4px rgba(0,0,0,.3);">${label}</div>`,
+    iconSize: [62, 26],
+    iconAnchor: [31, 13],
   });
 }
 
-function getBoundsString(map: L.Map): string {
+function getBoundsString(
+map: L.Map): string {
   const b = map.getBounds();
   return `${b.getSouth()},${b.getWest()},${b.getNorth()},${b.getEast()}`;
 }
@@ -408,8 +405,8 @@ export default function MapView({
   return (
     <MapContainer center={initialCenter} zoom={initialZoom} className="h-full w-full">
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
       />
       <MapController
         onBoundsChange={fetchStations}
@@ -498,6 +495,7 @@ export default function MapView({
         className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] flex flex-col gap-2 items-center w-[calc(100%-1rem)] max-w-md"
         aria-live="polite"
       >
+        <FreshnessChip />
         {fallbackNotice && (
           <div
             role="status"

@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Circle, Popup, useMapEvents } from "react-leaflet";
+import type { Circle as LeafletCircle } from "leaflet";
 import { Station, FuelCode } from "@/lib/types";
 
 /**
@@ -33,6 +34,7 @@ export default function AreaAverageLayer({
   fuel: FuelCode;
 }) {
   const [point, setPoint] = useState<{ lat: number; lng: number } | null>(null);
+  const circleRef = useRef<LeafletCircle | null>(null);
 
   useMapEvents({
     click(e) {
@@ -40,6 +42,12 @@ export default function AreaAverageLayer({
       setPoint({ lat: e.latlng.lat, lng: e.latlng.lng });
     },
   });
+
+  // Open the readout immediately on tap — otherwise the popup only shows on a
+  // second click of the circle.
+  useEffect(() => {
+    if (point && circleRef.current) circleRef.current.openPopup();
+  }, [point]);
 
   if (!enabled || !point) return null;
 
@@ -55,6 +63,7 @@ export default function AreaAverageLayer({
 
   return (
     <Circle
+      ref={circleRef}
       center={[point.lat, point.lng]}
       radius={RADIUS_KM * 1000}
       pathOptions={{ color: "#0f766e", weight: 1, fillColor: "#0f766e", fillOpacity: 0.08 }}
