@@ -20,6 +20,8 @@ import AreaAverageLayer from "./AreaAverageLayer";
 import SaObligations from "./SaObligations";
 import FreshnessChip from "./FreshnessChip";
 import "leaflet/dist/leaflet.css";
+import MarkerClusterGroup from "react-leaflet-cluster";
+import "leaflet.markercluster/dist/MarkerCluster.css";
 
 // Fix Leaflet default marker icons in Next.js
 delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl;
@@ -56,6 +58,33 @@ function createExciseIcon(label: string, color: string): L.DivIcon {
     html: `<div style="display:flex;align-items:center;justify-content:center;width:62px;height:26px;"><span style="background:${color};color:#fff;padding:3px 8px;border-radius:9px;font:600 12px/1.1 -apple-system,system-ui,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums;letter-spacing:.2px;white-space:nowrap;border:1px solid rgba(0,0,0,.12);box-shadow:0 1px 4px rgba(0,0,0,.3);">${label}</span></div>`,
     iconSize: [62, 26],
     iconAnchor: [31, 13],
+  });
+}
+
+// Neutral cluster bubble: shows the CHEAPEST price grouped inside (falling back
+// to a count until per-marker prices attach). Deliberately slate — NOT a rank
+// colour — so a cluster is never misread as a cheap/expensive price signal.
+function createClusterIcon(cluster: L.MarkerCluster): L.DivIcon {
+  const count = cluster.getChildCount();
+  let min = Infinity;
+  for (const m of cluster.getAllChildMarkers()) {
+    const p = (m.options as { price?: number }).price;
+    if (typeof p === "number" && Number.isFinite(p) && p < min) min = p;
+  }
+  const hasPrice = Number.isFinite(min);
+  const size = count < 10 ? 42 : count < 50 ? 48 : 54;
+  const main = hasPrice ? min.toFixed(1) : String(count);
+  const sub = hasPrice
+    ? `<span style="font-size:10px;font-weight:500;opacity:.8;line-height:1;">${count} stns</span>`
+    : "";
+  const cap = hasPrice
+    ? `<span style="font-size:8px;font-weight:600;opacity:.7;letter-spacing:.4px;line-height:1;">FROM</span>`
+    : "";
+  return L.divIcon({
+    className: "fs-cluster",
+    html: `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:${size}px;height:${size}px;border-radius:50%;background:#334155;color:#fff;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35);font:700 14px/1 -apple-system,system-ui,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums;">${cap}<span>${main}</span>${sub}</div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
   });
 }
 
@@ -450,6 +479,13 @@ export default function MapView({
       <FlyTo center={listTarget} />
       <InvalidateOnResize />
       <AreaAverageLayer enabled={areaMode} stations={stations} fuel={displayFuel} />
+      <MarkerClusterGroup
+        key={`${brandFilter}:${displayFuel}`}
+        iconCreateFunction={createClusterIcon}
+        showCoverageOnHover={false}
+        maxClusterRadius={60}
+        chunkedLoading
+      >
       {visibleStations.map((station) => {
         const priceEntry = station.prices.find((p) => p.fuel === displayFuel);
         if (!priceEntry) return null;
@@ -515,7 +551,14 @@ export default function MapView({
         const icon = createPriceIcon(labelPrice, color, eff?.hasDiscount ?? false);
 
         return (
-          <Marker key={station.id} position={[station.lat, station.lng]} icon={icon}>
+          <Marker
+            key={station.id}
+            position={[station.lat, station.lng]}
+            icon={icon}
+            ref={(m) => {
+              if (m) (m.options as { price?: number }).price = labelPrice;
+            }}
+          >
             <Popup>
               <StationPricePopupContent
                 station={station}
@@ -526,6 +569,7 @@ export default function MapView({
           </Marker>
         );
       })}
+      </MarkerClusterGroup>
       {/* Top-stacked notices: fuel fallback, loading */}
       <div
         className="absolute top-2 left-1/2 -translate-x-1/2 z-[1000] flex flex-col gap-2 items-center w-[calc(100%-1rem)] max-w-md"
