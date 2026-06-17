@@ -356,6 +356,7 @@ export default function MapView({
   const { discounts: activeDiscounts } = useDiscounts();
   const [areaMode, setAreaMode] = useState(false);
   const [listTarget, setListTarget] = useState<[number, number] | null>(null);
+  const [brandFilter, setBrandFilter] = useState<string>("");
 
   const fetchStations = useCallback(
     async (bounds: string) => {
@@ -415,8 +416,11 @@ export default function MapView({
   const initialCenter: [number, number] = saved ? [saved.lat, saved.lng] : [-25.5, 134.5];
   const initialZoom = saved ? saved.zoom : 5;
 
+  const brandsInView = Array.from(new Set(stations.map((s) => s.brand))).sort();
+  const visibleStations = brandFilter ? stations.filter((s) => s.brand === brandFilter) : stations;
+
   // In-view stations, cheapest first, for the desktop side panel.
-  const listRows = stations
+  const listRows = visibleStations
     .map((s) => {
       const eff = effectiveById.get(s.id);
       const color = colorById.get(s.id);
@@ -446,7 +450,7 @@ export default function MapView({
       <FlyTo center={listTarget} />
       <InvalidateOnResize />
       <AreaAverageLayer enabled={areaMode} stations={stations} fuel={displayFuel} />
-      {stations.map((station) => {
+      {visibleStations.map((station) => {
         const priceEntry = station.prices.find((p) => p.fuel === displayFuel);
         if (!priceEntry) return null;
 
@@ -550,9 +554,23 @@ export default function MapView({
       </div>
     </MapContainer>
     <aside className="hidden md:flex md:flex-col w-80 bg-white border-l border-slate-200 overflow-y-auto">
-      <div className="sticky top-0 bg-white border-b border-slate-200 px-3 py-2 text-xs text-slate-500">
-        {listRows.length} stations in view
-        {listRows[0] ? ` \u00b7 cheapest ${listRows[0].effectiveCpl.toFixed(1)} c/L` : ""}
+      <div className="sticky top-0 bg-white border-b border-slate-200 px-3 py-2">
+        <div className="text-xs text-slate-500">
+          {listRows.length} stations in view{listRows[0] ? ` · cheapest ${listRows[0].effectiveCpl.toFixed(1)} c/L` : ""}
+        </div>
+        <select
+          value={brandFilter}
+          onChange={(e) => setBrandFilter(e.target.value)}
+          className="mt-1.5 w-full text-xs border border-slate-300 rounded px-2 py-1 bg-white text-slate-700"
+          aria-label="Filter by brand"
+        >
+          <option value="">All brands</option>
+          {brandsInView.map((b) => (
+            <option key={b} value={b}>
+              {b}
+            </option>
+          ))}
+        </select>
       </div>
       <ul>
         {listRows.map((r) => (
