@@ -54,3 +54,56 @@ html, body {
   70% { box-shadow: 0 0 12px 14px rgba(37, 99, 235, 0); }
   100% { box-shadow: 0 0 12px 2px rgba(37, 99, 235, 0); }
 }
+
+/* ============================================================
+   Theme tokens. style → structure (fonts/radius/border/density),
+   palette → colour. Applied via data-style / data-palette on <html>.
+   Components read the --fs-* custom properties. Defaults = friendly/teal.
+   ============================================================ */
+:root {
+  --fs-font-head: var(--font-baloo), system-ui, sans-serif;
+  --fs-font-body: var(--font-nunito), system-ui, sans-serif;
+  --fs-font-num: var(--font-baloo), system-ui, sans-serif;
+  --fs-radius-card: 20px; --fs-radius-chip: 999px; --fs-radius-pin: 999px;
+  --fs-radius-logo: 13px; --fs-radius-av: 11px; --fs-radius-nav: 999px;
+  --fs-border-w: 1px; --fs-shadow: 0 8px 22px rgba(20,40,40,.10); --fs-num-fw: 700;
+  --fs-chip-tt: none; --fs-nav-tt: none; --fs-nav-ls: 0; --fs-small-tt: none;
+  --fs-bg:#EEF8F4; --fs-surface:#fff; --fs-ink:#1E2A2A; --fs-muted:#6E8480;
+  --fs-line:#E2EEE9; --fs-grey:#9AA8A4; --fs-accent:#0FB39A; --fs-accent-ink:#fff;
+  --fs-green:#16B36A; --fs-amber:#F2A33C; --fs-red:#F0654F;
+  --fs-card-bg:#fff; --fs-card-k:#0A8C78; --fs-card-ink:#1E2A2A; --fs-card-muted:#6E8480;
+  --fs-map-bg:#E4F1EC; --fs-road:#D2E8E0; --fs-water:#CDE8F2;
+}
+
+[data-style="friendly"] {
+  --fs-font-head: var(--font-baloo), system-ui, sans-serif;
+  --fs-font-body: var(--font-nunito), system-ui, sans-serif;
+  --fs-font-num: var(--font-baloo), system-ui, sans-serif;
+  --fs-radius-card: 20px; --fs-radius-chip: 999px; --fs-radius-pin: 999px;
+  --fs-radius-logo: 13px; --fs-radius-av: 11px; --fs-radius-nav: 999px;
+  --fs-border-w: 1px; --fs-shadow: 0 8px 22px rgba(20,40,40,.10); --fs-num-fw: 700;
+  --fs-chip-tt: none; --fs-nav-tt: none; --fs-nav-ls: 0; --fs-small-tt: none;
+}
+[data-style="util"] {
+  --fs-font-head: var(--font-plex), system-ui, sans-serif;
+  --fs-font-body: var(--font-plex), system-ui, sans-serif;
+  --fs-font-num: var(--font-plex-mono), ui-monospace, monospace;
+  --fs-radius-card: 4px; --fs-radius-chip: 4px; --fs-radius-pin: 4px;
+  --fs-radius-logo: 5px; --fs-radius-av: 4px; --fs-radius-nav: 4px;
+  --fs-border-w: 1px; --fs-shadow: none; --fs-num-fw: 600;
+  --fs-chip-tt: uppercase; --fs-nav-tt: uppercase; --fs-nav-ls: .08em; --fs-small-tt: uppercase;
+}
+
+/* Friendly palettes */
+[data-palette="teal"]{--fs-bg:#EEF8F4;--fs-surface:#fff;--fs-ink:#1E2A2A;--fs-muted:#6E8480;--fs-line:#E2EEE9;--fs-grey:#9AA8A4;--fs-accent:#0FB39A;--fs-accent-ink:#fff;--fs-green:#16B36A;--fs-amber:#F2A33C;--fs-red:#F0654F;--fs-card-bg:#fff;--fs-card-k:#0A8C78;--fs-card-ink:#1E2A2A;--fs-card-muted:#6E8480;--fs-map-bg:#E4F1EC;--fs-road:#D2E8E0;--fs-water:#CDE8F2}
+[data-palette="citrus"]{--fs-bg:#FFF7EC;--fs-surface:#fff;--fs-ink:#3A2E16;--fs-muted:#8A7657;--fs-line:#F1E6D0;--fs-grey:#BFAE8C;--fs-accent:#F2920C;--fs-accent-ink:#fff;--fs-green:#2FA866;--fs-amber:#C77A12;--fs-red:#E0533A;--fs-card-bg:#fff;--fs-card-k:#B5660A;--fs-card-ink:#3A2E16;--fs-card-muted:#8A7657;--fs-map-bg:#F6ECDA;--fs-road:#EFE0C6;--fs-water:#DCEAF0}
+[data-palette="coral"]{--fs-bg:#FFF4F1;--fs-surface:#fff;--fs-ink:#21303A;--fs-muted:#6B7C86;--fs-line:#EFE2DE;--fs-grey:#A9B4BA;--fs-accent:#FB6F61;--fs-accent-ink:#fff;--fs-green:#18AE6B;--fs-amber:#F0A53C;--fs-red:#E64A3B;--fs-card-bg:#fff;--fs-card-k:#C24536;--fs-card-ink:#21303A;--fs-card-muted:#6B7C86;--fs-map-bg:#F1EAE7;--fs-road:#E6DCD8;--fs-water:#D7E6EC}
+[data-palette="sky"]{--fs-bg:#EEF4FB;--fs-surface:#fff;--fs-ink:#1B2733;--fs-muted:#6A7783;--fs-line:#E1E8F0;--fs-grey:#9AA7B3;--fs-accent:#2F86E0;--fs-accent-ink:#fff;--fs-green:#19A463;--fs-amber:#EFA63A;--fs-red:#EC5B4A;--fs-card-bg:#fff;--fs-card-k:#1C5FA8;--fs-card-ink:#1B2733;--fs-card-muted:#6A7783;--fs-map-bg:#E6EEF6;--fs-road:#D7E2EE;--fs-water:#CFE0F2}
+[data-palette="berry"]{--fs-bg:#F5F1FC;--fs-surface:#fff;--fs-ink:#2A2440;--fs-muted:#756E8C;--fs-line:#E9E3F3;--fs-grey:#A79FBE;--fs-accent:#7C5CD6;--fs-accent-ink:#fff;--fs-green:#18AE6B;--fs-amber:#F0A53C;--fs-red:#EC5B6A;--fs-card-bg:#fff;--fs-card-k:#5B3FB0;--fs-card-ink:#2A2440;--fs-card-muted:#756E8C;--fs-map-bg:#ECE7F5;--fs-road:#E0D8EE;--fs-water:#D8E4F2}
+
+/* Utilitarian palettes */
+[data-palette="blueprint"]{--fs-bg:#F2F5F9;--fs-surface:#fff;--fs-ink:#0F1B2D;--fs-muted:#5A6A7E;--fs-line:#C9D6E4;--fs-grey:#8493A5;--fs-accent:#1F6FEB;--fs-accent-ink:#fff;--fs-green:#1A8E55;--fs-amber:#C77F12;--fs-red:#D23B2C;--fs-card-bg:#fff;--fs-card-k:#1A57C0;--fs-card-ink:#0F1B2D;--fs-card-muted:#5A6A7E;--fs-map-bg:#EAF0F7;--fs-road:#D4E0EE;--fs-water:#CFE0F2}
+[data-palette="lime"]{--fs-bg:#ECEAE3;--fs-surface:#fff;--fs-ink:#0E0E0E;--fs-muted:#4A4A46;--fs-line:#0E0E0E;--fs-grey:#3A3A38;--fs-accent:#C6F24E;--fs-accent-ink:#1B2400;--fs-green:#1F8A4C;--fs-amber:#C97A12;--fs-red:#D8331F;--fs-card-bg:#0E0E0E;--fs-card-k:#C6F24E;--fs-card-ink:#fff;--fs-card-muted:#bdbdbd;--fs-map-bg:#DEDCD4;--fs-road:#C9C7BF;--fs-water:#CFE0DA}
+[data-palette="hivis"]{--fs-bg:#17191D;--fs-surface:#1E2228;--fs-ink:#F2F0EA;--fs-muted:#9CA0A6;--fs-line:#30343C;--fs-grey:#70757D;--fs-accent:#FFB000;--fs-accent-ink:#1C1400;--fs-green:#3FC56B;--fs-amber:#E59400;--fs-red:#FF5A4D;--fs-card-bg:#1E2228;--fs-card-k:#FFB000;--fs-card-ink:#F2F0EA;--fs-card-muted:#9CA0A6;--fs-map-bg:#101216;--fs-road:#262A31;--fs-water:#15282E}
+[data-palette="terminal"]{--fs-bg:#0A0F0A;--fs-surface:#0E140E;--fs-ink:#CFE9D3;--fs-muted:#6E8A72;--fs-line:#1B2A1D;--fs-grey:#4F6B53;--fs-accent:#43F08A;--fs-accent-ink:#04210F;--fs-green:#43F08A;--fs-amber:#E3C341;--fs-red:#FF6B6B;--fs-card-bg:#0E140E;--fs-card-k:#43F08A;--fs-card-ink:#CFE9D3;--fs-card-muted:#6E8A72;--fs-map-bg:#070B07;--fs-road:#142016;--fs-water:#0C2417}
+[data-palette="swiss"]{--fs-bg:#FFFFFF;--fs-surface:#fff;--fs-ink:#111111;--fs-muted:#555555;--fs-line:#111111;--fs-grey:#444444;--fs-accent:#E5392E;--fs-accent-ink:#fff;--fs-green:#1F8A4C;--fs-amber:#C97A12;--fs-red:#E5392E;--fs-card-bg:#111;--fs-card-k:#E5392E;--fs-card-ink:#fff;--fs-card-muted:#bbb;--fs-map-bg:#EFEFEF;--fs-road:#DCDCDC;--fs-water:#DBE4E8}

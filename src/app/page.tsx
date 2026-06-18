@@ -1,5 +1,7 @@
 "use client";
 
+import Wordmark from "@/components/Wordmark";
+
 import dynamic from "next/dynamic";
 import { useState, useRef, useEffect } from "react";
 import FuelSelect from "@/components/FuelSelect";
@@ -83,7 +85,7 @@ export default function Home() {
       {/* ---------- Desktop side panel (md+) ---------- */}
       <aside className="hidden md:flex md:flex-col absolute left-0 top-0 bottom-0 w-96 bg-slate-800 text-white z-[1000] shadow-xl safe-area-top safe-area-inset">
         <div className="px-4 py-3 border-b border-slate-700">
-          <h1 className="font-bold text-lg whitespace-nowrap">FuelSmart AU</h1>
+          <h1 className="font-bold text-lg whitespace-nowrap"><Wordmark tone="onDark" /><span className="font-normal text-slate-400"> AU</span></h1>
           <p className="text-xs text-slate-400 mt-0.5">
             Live fuel prices across Australia
           </p>
@@ -196,9 +198,7 @@ export default function Home() {
       <header className="md:hidden absolute top-0 left-0 right-0 z-[1000] safe-area-top safe-area-inset pointer-events-none">
         <div className="px-2 pt-2 pointer-events-auto">
           <div className="bg-slate-800/95 backdrop-blur-sm text-white rounded-xl shadow-lg flex items-center gap-1 px-1.5 py-1.5">
-            <span className="font-bold text-sm whitespace-nowrap pl-2 pr-1">
-              FuelSmart
-            </span>
+            <span className="text-sm whitespace-nowrap pl-2 pr-1"><Wordmark tone="onDark" /></span>
 
             <div className="flex-1" />
 
