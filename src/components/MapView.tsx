@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, type RefObject } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Station, FuelCode } from "@/lib/types";
@@ -209,6 +209,62 @@ function InvalidateOnResize() {
   return null;
 }
 
+const SELECT_HALO = L.divIcon({
+  className: "fs-halo-wrap",
+  html: `<div class="fs-halo"></div>`,
+  iconSize: [72, 72],
+  iconAnchor: [36, 36],
+});
+
+/**
+ * Highlights one station after it's picked from the sidebar: reveals it from any
+ * cluster (zooming/spiderfying as needed), centres it, and rings it with a
+ * pulsing halo until the next genuine map gesture. The halo lives in shadowPane
+ * so the price pill stays on top and clickable.
+ */
+function SelectionLayer({
+  selected,
+  clusterRef,
+  markersById,
+  onClear,
+}: {
+  selected: { id: string; lat: number; lng: number } | null;
+  clusterRef: RefObject<L.MarkerClusterGroup | null>;
+  markersById: RefObject<Map<string, L.Marker>>;
+  onClear: () => void;
+}) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!selected) return;
+    const group = clusterRef.current;
+    const marker = markersById.current?.get(selected.id);
+    if (group && marker) {
+      group.zoomToShowLayer(marker, () => map.panTo([selected.lat, selected.lng]));
+    } else {
+      map.flyTo([selected.lat, selected.lng], Math.max(map.getZoom(), 15));
+    }
+  }, [selected, map, clusterRef, markersById]);
+
+  // The programmatic reveal fires move/zoom but NOT these gesture events, so the
+  // highlight survives the fly and clears only when the user touches the map.
+  useMapEvents({
+    mousedown: onClear,
+    dragstart: onClear,
+  });
+
+  if (!selected) return null;
+  return (
+    <Marker
+      position={[selected.lat, selected.lng]}
+      icon={SELECT_HALO}
+      pane="shadowPane"
+      interactive={false}
+      keyboard={false}
+    />
+  );
+}
+
 interface Props {
   fuel: FuelCode;
   flyTo: [number, number] | null;
@@ -391,7 +447,9 @@ export default function MapView({
   const fetchController = useRef<AbortController | null>(null);
   const { discounts: activeDiscounts } = useDiscounts();
   const [areaMode, setAreaMode] = useState(false);
-  const [listTarget, setListTarget] = useState<[number, number] | null>(null);
+  const [selected, setSelected] = useState<{ id: string; lat: number; lng: number } | null>(null);
+  const clusterRef = useRef<L.MarkerClusterGroup | null>(null);
+  const markersById = useRef<Map<string, L.Marker>>(new Map());
   const [brandFilter, setBrandFilter] = useState<string>("");
 
   const fetchStations = useCallback(
@@ -483,10 +541,16 @@ export default function MapView({
         fuel={fuel}
       />
       <FlyTo center={flyTo} />
-      <FlyTo center={listTarget} />
       <InvalidateOnResize />
+      <SelectionLayer
+        selected={selected}
+        clusterRef={clusterRef}
+        markersById={markersById}
+        onClear={() => setSelected(null)}
+      />
       <AreaAverageLayer enabled={areaMode} stations={stations} fuel={displayFuel} />
       <MarkerClusterGroup
+        ref={clusterRef}
         key={`${brandFilter}:${displayFuel}`}
         iconCreateFunction={createClusterIcon}
         showCoverageOnHover={false}
@@ -567,6 +631,9 @@ export default function MapView({
                 const o = m.options as { price?: number; color?: string };
                 o.price = labelPrice;
                 o.color = color;
+                markersById.current.set(station.id, m);
+              } else {
+                markersById.current.delete(station.id);
               }
             }}
           >
@@ -632,7 +699,7 @@ export default function MapView({
           <li key={r.station.id}>
             <button
               type="button"
-              onClick={() => setListTarget([r.station.lat, r.station.lng])}
+              onClick={() => setSelected({ id: r.station.id, lat: r.station.lat, lng: r.station.lng })}
               className="w-full text-left px-3 py-2 border-b border-slate-100 hover:bg-slate-50 flex items-center gap-2"
             >
               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: r.color }} aria-hidden="true" />
