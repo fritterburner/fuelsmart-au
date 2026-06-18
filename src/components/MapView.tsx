@@ -67,11 +67,18 @@ function createExciseIcon(label: string, color: string): L.DivIcon {
 function createClusterIcon(cluster: L.MarkerCluster): L.DivIcon {
   const count = cluster.getChildCount();
   let min = Infinity;
+  let minColor = "#334155";
   for (const m of cluster.getAllChildMarkers()) {
-    const p = (m.options as { price?: number }).price;
-    if (typeof p === "number" && Number.isFinite(p) && p < min) min = p;
+    const o = m.options as { price?: number; color?: string };
+    if (typeof o.price === "number" && Number.isFinite(o.price) && o.price < min) {
+      min = o.price;
+      minColor = o.color ?? minColor;
+    }
   }
   const hasPrice = Number.isFinite(min);
+  // Colour the bubble by the CHEAPEST station it contains, using the same rank
+  // palette as the pins — so a green cluster flags "the cheap options are here".
+  const bg = hasPrice ? minColor : "#334155";
   const size = count < 10 ? 42 : count < 50 ? 48 : 54;
   const main = hasPrice ? min.toFixed(1) : String(count);
   const sub = hasPrice
@@ -82,7 +89,7 @@ function createClusterIcon(cluster: L.MarkerCluster): L.DivIcon {
     : "";
   return L.divIcon({
     className: "fs-cluster",
-    html: `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:${size}px;height:${size}px;border-radius:50%;background:#334155;color:#fff;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35);font:700 14px/1 -apple-system,system-ui,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums;">${cap}<span>${main}</span>${sub}</div>`,
+    html: `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;width:${size}px;height:${size}px;border-radius:50%;background:${bg};color:#fff;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35);font:700 14px/1 -apple-system,system-ui,'Segoe UI',sans-serif;font-variant-numeric:tabular-nums;">${cap}<span>${main}</span>${sub}</div>`,
     iconSize: [size, size],
     iconAnchor: [size / 2, size / 2],
   });
@@ -556,7 +563,11 @@ export default function MapView({
             position={[station.lat, station.lng]}
             icon={icon}
             ref={(m) => {
-              if (m) (m.options as { price?: number }).price = labelPrice;
+              if (m) {
+                const o = m.options as { price?: number; color?: string };
+                o.price = labelPrice;
+                o.color = color;
+              }
             }}
           >
             <Popup>
