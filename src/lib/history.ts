@@ -181,6 +181,53 @@ export async function getStationHistory(stationId: string, fuel: FuelCode, days:
 }
 
 /**
+ * Pure: average (and min) one day's stored per-station prices across a set of
+ * station ids, for one fuel. Exported so the aggregation is unit-testable
+ * without Redis.
+ */
+export function aggregateAreaDay(
+  parsed: StationDay | null,
+  ids: string[],
+  fuel: FuelCode,
+): { avg: number | null; min: number | null } {
+  if (!parsed) return { avg: null, min: null };
+  let sum = 0;
+  let count = 0;
+  let min = Infinity;
+  for (const id of ids) {
+    const price = parsed[id]?.[fuel];
+    if (typeof price === "number" && Number.isFinite(price)) {
+      sum += price;
+      count += 1;
+      if (price < min) min = price;
+    }
+  }
+  if (count === 0) return { avg: null, min: null };
+  return { avg: Math.round((sum / count) * 10) / 10, min };
+}
+
+/**
+ * 30-day averaged price history for an arbitrary set of stations — the "tap an
+ * area" circle. Reads the SAME daily per-station snapshots the per-station
+ * sparkline already reads, so it adds no extra Redis cost beyond one station's
+ * history (the day blobs are fetched once and averaged across the ids).
+ */
+export async function getAreaHistory(
+  stationIds: string[],
+  fuel: FuelCode,
+  days: number = 30,
+): Promise<StatePricePoint[]> {
+  if (stationIds.length === 0) return [];
+  const dates = lastNDays(days);
+  const blobs = await Promise.all(dates.map((d) => redis.get(`history:stations:${d}`)));
+  return dates.map((date, i) => {
+    const parsed = parseBlob<StationDay>(blobs[i]);
+    const { avg, min } = aggregateAreaDay(parsed, stationIds, fuel);
+    return { date, avg, min };
+  });
+}
+
+/**
  * Merge ONE state's daily aggregate into history:state:<date>, preserving other
  * states already stored for that day (used by the one-off backfill).
  */
