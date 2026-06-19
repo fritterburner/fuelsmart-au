@@ -670,20 +670,20 @@ export default function MapView({
       </div>
       {/* End top-stacked notices */}
       <div className="absolute bottom-4 left-3 z-[1000] pointer-events-auto">
-        <button type="button" onClick={() => setAreaMode((m) => !m)} aria-pressed={areaMode} className={"inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium shadow-lg transition-colors " + (areaMode ? "bg-emerald-600 text-white" : "bg-white text-slate-800 hover:bg-slate-100")}>
+        <button type="button" onClick={() => setAreaMode((m) => !m)} aria-pressed={areaMode} className={"inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium shadow-lg transition-colors " + (areaMode ? "bg-fs-accent text-fs-accent-ink" : "bg-fs-surface text-fs-ink hover:bg-fs-bg")}>
           <span aria-hidden="true">📍</span> {areaMode ? "Tap the map…" : "Area average"}
         </button>
       </div>
     </MapContainer>
-    <aside className="hidden md:flex md:flex-col w-80 bg-white border-l border-slate-200 overflow-y-auto">
-      <div className="sticky top-0 bg-white border-b border-slate-200 px-3 py-2">
-        <div className="text-xs text-slate-500">
+    <aside className="hidden md:flex md:flex-col w-80 bg-fs-surface text-fs-ink border-l border-fs-line overflow-y-auto" style={{ fontFamily: "var(--fs-font-body)" }}>
+      <div className="sticky top-0 bg-fs-surface border-b border-fs-line px-3 py-2">
+        <div className="text-xs text-fs-muted">
           {listRows.length} stations in view{listRows[0] ? ` · cheapest ${listRows[0].effectiveCpl.toFixed(1)} c/L` : ""}
         </div>
         <select
           value={brandFilter}
           onChange={(e) => setBrandFilter(e.target.value)}
-          className="mt-1.5 w-full text-xs border border-slate-300 rounded px-2 py-1 bg-white text-slate-700"
+          className="mt-1.5 w-full text-xs border border-fs-line rounded px-2 py-1 bg-fs-surface text-fs-ink"
           aria-label="Filter by brand"
         >
           <option value="">All brands</option>
@@ -700,17 +700,17 @@ export default function MapView({
             <button
               type="button"
               onClick={() => setSelected({ id: r.station.id, lat: r.station.lat, lng: r.station.lng })}
-              className="w-full text-left px-3 py-2 border-b border-slate-100 hover:bg-slate-50 flex items-center gap-2"
+              className="w-full text-left px-3 py-2 border-b border-fs-line hover:bg-fs-bg flex items-center gap-2"
             >
               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: r.color }} aria-hidden="true" />
               <span className="flex-1 min-w-0">
-                <span className="block text-sm font-medium text-slate-800 truncate">{r.station.brand}</span>
-                <span className="block text-xs text-slate-500 truncate">{r.station.suburb || r.station.address}</span>
+                <span className="block text-sm font-medium text-fs-ink truncate">{r.station.brand}</span>
+                <span className="block text-xs text-fs-muted truncate">{r.station.suburb || r.station.address}</span>
               </span>
               <span className="text-right flex-shrink-0">
-                <span className="block text-sm font-semibold text-slate-900">{r.effectiveCpl.toFixed(1)}</span>
+                <span className="block text-sm font-semibold text-fs-ink">{r.effectiveCpl.toFixed(1)}</span>
                 {r.hasDiscount && (
-                  <span className="block text-[10px] text-slate-400 line-through">{r.pump.toFixed(1)}</span>
+                  <span className="block text-[10px] text-fs-muted line-through">{r.pump.toFixed(1)}</span>
                 )}
               </span>
             </button>

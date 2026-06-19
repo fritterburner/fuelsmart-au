@@ -83,10 +83,10 @@ export default function Home() {
   return (
     <div className="h-dvh w-screen relative overflow-hidden overscroll-none">
       {/* ---------- Desktop side panel (md+) ---------- */}
-      <aside className="hidden md:flex md:flex-col absolute left-0 top-0 bottom-0 w-96 bg-slate-800 text-white z-[1000] shadow-xl safe-area-top safe-area-inset">
-        <div className="px-4 py-3 border-b border-slate-700">
-          <h1 className="font-bold text-lg whitespace-nowrap"><Wordmark tone="onDark" /><span className="font-normal text-slate-400"> AU</span></h1>
-          <p className="text-xs text-slate-400 mt-0.5">
+      <aside className="hidden md:flex md:flex-col absolute left-0 top-0 bottom-0 w-96 bg-fs-surface text-fs-ink border-r border-fs-line z-[1000] shadow-xl safe-area-top safe-area-inset" style={{ fontFamily: "var(--fs-font-body)" }}>
+        <div className="px-4 py-3 border-b border-fs-line">
+          <h1 className="font-bold text-lg whitespace-nowrap"><Wordmark /><span className="font-normal text-fs-muted"> AU</span></h1>
+          <p className="text-xs text-fs-muted mt-0.5">
             Live fuel prices across Australia
           </p>
         </div>
@@ -110,13 +110,13 @@ export default function Home() {
           <div className="px-4 py-3 grid grid-cols-2 gap-2">
             <a
               href="/fill-up"
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-sm font-medium transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-fs-accent text-fs-accent-ink hover:opacity-90 px-3 py-2 text-sm font-medium transition-colors"
             >
               <span aria-hidden="true">📍</span> Find a stop
             </a>
             <a
               href="/trip"
-              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 py-2 text-sm font-medium transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-fs-accent text-fs-accent-ink hover:opacity-90 px-3 py-2 text-sm font-medium transition-colors"
             >
               <span aria-hidden="true">🚗</span> Plan a trip
             </a>
@@ -126,7 +126,7 @@ export default function Home() {
             <DiscountNudge variant="inline" />
           </div>
 
-          <nav className="border-t border-slate-700 py-2" aria-label="Tools">
+          <nav className="border-t border-fs-line py-2" aria-label="Tools">
             <ExciseToggle
               mode={exciseMode}
               onToggle={handleToggleExcise}
@@ -135,49 +135,49 @@ export default function Home() {
             {EXCISE_ENABLED && (
 <a
               href="/excise"
-              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-fs-bg transition-colors"
             >
               <span aria-hidden="true">📘</span> How excise is calculated
             </a>
 )}
             <a
               href="/compare"
-              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-fs-bg transition-colors"
             >
               <span aria-hidden="true">🚙</span> Compare running costs
             </a>
             <a
               href="/history"
-              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-fs-bg transition-colors"
             >
               <span aria-hidden="true">📈</span> 30-day price history
             </a>
             <a
               href="/additives"
-              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-fs-bg transition-colors"
             >
               <span aria-hidden="true">🧪</span> Fuel additives: worth it?
             </a>
             <a
               href="/discounts"
-              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-fs-bg transition-colors"
             >
               <span aria-hidden="true">💳</span> Discounts &amp; loyalty
             </a>
             <a
               href="/settings"
-              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-slate-700 transition-colors"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-fs-bg transition-colors"
             >
               <span aria-hidden="true">⚙️</span> Settings
             </a>
           </nav>
         </div>
 
-        <footer className="border-t border-slate-700 px-4 py-2 text-[11px] text-slate-400 leading-snug safe-area-bottom">
+        <footer className="border-t border-fs-line px-4 py-2 text-[11px] text-fs-muted leading-snug safe-area-bottom">
           <div className="flex flex-wrap gap-x-3 gap-y-1">
-            <a href="/data-freshness" className="underline hover:text-slate-200">Data sources</a>
-            <a href="/privacy" className="underline hover:text-slate-200">Privacy</a>
-            <a href="/terms" className="underline hover:text-slate-200">Terms</a>
+            <a href="/data-freshness" className="underline hover:text-fs-ink">Data sources</a>
+            <a href="/privacy" className="underline hover:text-fs-ink">Privacy</a>
+            <a href="/terms" className="underline hover:text-fs-ink">Terms</a>
           </div>
         </footer>
       </aside>

@@ -6,9 +6,16 @@ interface Props {
   onSelect: (lat: number, lng: number) => void;
 }
 
+interface GeoResult {
+  display_name: string;
+  lat: string;
+  lon: string;
+  address?: { suburb?: string; state?: string; postcode?: string };
+}
+
 export default function LocationSearch({ onSelect }: Props) {
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<{ display_name: string; lat: string; lon: string }[]>([]);
+  const [results, setResults] = useState<GeoResult[]>([]);
   const [searching, setSearching] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -33,7 +40,7 @@ export default function LocationSearch({ onSelect }: Props) {
   }
 
   // Format result to show state context: "Katherine, NT" not just "Katherine"
-  function formatResult(r: any): string {
+  function formatResult(r: GeoResult): string {
     const parts: string[] = [];
     const name = r.display_name.split(",")[0].trim();
     parts.push(name);
@@ -69,12 +76,12 @@ export default function LocationSearch({ onSelect }: Props) {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && search()}
           placeholder="Search suburb or postcode..."
-          className="flex-1 min-h-[44px] px-3 py-2 rounded-l-lg border border-slate-600 bg-slate-700 text-white placeholder-slate-400 text-sm focus:ring-2 focus:ring-emerald-400 focus:border-emerald-400 focus:outline-none"
+          className="flex-1 min-h-[44px] px-3 py-2 rounded-l-lg border border-fs-line bg-fs-bg text-fs-ink placeholder-fs-muted text-sm focus:ring-2 focus:ring-fs-accent focus:border-fs-accent focus:outline-none"
         />
         <button
           onClick={search}
           disabled={searching}
-          className="min-w-[44px] min-h-[44px] px-3 rounded-r-lg bg-emerald-600 active:bg-emerald-700 md:hover:bg-emerald-700 text-white font-medium text-sm transition-colors disabled:opacity-50 flex items-center justify-center"
+          className="min-w-[44px] min-h-[44px] px-3 rounded-r-lg bg-fs-accent text-fs-accent-ink active:opacity-90 md:hover:opacity-90 font-medium text-sm transition-colors disabled:opacity-50 flex items-center justify-center"
           aria-label="Search"
         >
           {searching ? (
@@ -91,19 +98,19 @@ export default function LocationSearch({ onSelect }: Props) {
       </div>
 
       {results.length > 0 && (
-        <ul className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-[1001] w-full md:max-w-md max-h-[50vh] md:max-h-60 overflow-y-auto">
+        <ul className="absolute top-full left-0 right-0 mt-1 bg-fs-surface border border-fs-line rounded-lg shadow-lg z-[1001] w-full md:max-w-md max-h-[50vh] md:max-h-60 overflow-y-auto">
           {results.map((r, i) => (
             <li
               key={i}
-              className="min-h-[44px] px-3 py-2.5 hover:bg-blue-50 active:bg-blue-100 cursor-pointer text-sm text-gray-800 border-b border-gray-100 last:border-0 flex flex-col justify-center"
+              className="min-h-[44px] px-3 py-2.5 hover:bg-fs-bg active:bg-fs-bg cursor-pointer text-sm text-fs-ink border-b border-fs-line last:border-0 flex flex-col justify-center"
               onClick={() => {
                 onSelect(Number(r.lat), Number(r.lon));
                 setResults([]);
                 setQuery(formatResult(r));
               }}
             >
-              <div className="font-medium">{(r as any).display_name.split(",")[0]}</div>
-              <div className="text-xs text-gray-500 truncate">{(r as any).display_name}</div>
+              <div className="font-medium">{r.display_name.split(",")[0]}</div>
+              <div className="text-xs text-fs-muted truncate">{r.display_name}</div>
             </li>
           ))}
         </ul>

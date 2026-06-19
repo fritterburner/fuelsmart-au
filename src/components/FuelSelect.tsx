@@ -46,10 +46,10 @@ export default function FuelSelect({ value, onChange }: Props) {
   }
 
   const baseChip =
-    "min-h-[44px] md:min-h-0 md:h-9 px-3 rounded-lg border text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400";
-  const activeChip = "bg-emerald-600 text-white border-emerald-500";
+    "min-h-[44px] md:min-h-0 md:h-9 px-3 rounded-lg border text-sm font-medium whitespace-nowrap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fs-accent";
+  const activeChip = "bg-fs-accent text-fs-accent-ink border-fs-accent";
   const idleChip =
-    "bg-slate-700 text-gray-200 border-slate-600 md:hover:bg-slate-600 active:bg-slate-600";
+    "bg-fs-bg text-fs-ink border-fs-line md:hover:bg-fs-line active:bg-fs-line";
 
   const moreActive = selectedIsSecondary;
   const moreLabel = moreActive ? selected!.short : "More";
@@ -101,9 +101,9 @@ export default function FuelSelect({ value, onChange }: Props) {
         <div
           role="listbox"
           aria-label="Other fuel types"
-          className="absolute top-full right-0 md:right-auto md:left-0 mt-1 w-56 bg-slate-700 border border-slate-600 rounded-lg shadow-lg overflow-hidden z-[1100]"
+          className="absolute top-full right-0 md:right-auto md:left-0 mt-1 w-56 bg-fs-surface border border-fs-line rounded-lg shadow-lg overflow-hidden z-[1100]"
         >
-          <div className="px-3 py-1.5 text-[11px] uppercase tracking-wide text-gray-400 bg-slate-800 border-b border-slate-600">
+          <div className="px-3 py-1.5 text-[11px] uppercase tracking-wide text-fs-muted bg-fs-bg border-b border-fs-line">
             Other fuel types
           </div>
           {SECONDARY.map((f) => {
@@ -117,8 +117,8 @@ export default function FuelSelect({ value, onChange }: Props) {
                 aria-selected={isActive}
                 className={`w-full text-left px-3 py-2.5 text-sm transition-colors ${
                   isActive
-                    ? "bg-emerald-600 text-white"
-                    : "text-gray-200 hover:bg-slate-600 active:bg-slate-600"
+                    ? "bg-fs-accent text-fs-accent-ink"
+                    : "text-fs-ink hover:bg-fs-bg active:bg-fs-bg"
                 }`}
               >
                 {f.name}

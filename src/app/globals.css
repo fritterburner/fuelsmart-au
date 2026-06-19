@@ -10,6 +10,14 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --color-fs-bg: var(--fs-bg);
+  --color-fs-surface: var(--fs-surface);
+  --color-fs-ink: var(--fs-ink);
+  --color-fs-muted: var(--fs-muted);
+  --color-fs-line: var(--fs-line);
+  --color-fs-grey: var(--fs-grey);
+  --color-fs-accent: var(--fs-accent);
+  --color-fs-accent-ink: var(--fs-accent-ink);
 }
 
 body {
