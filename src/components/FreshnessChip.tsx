@@ -43,7 +43,7 @@ export default function FreshnessChip() {
   if (!label) return null;
 
   return (
-    <div className="bg-white/95 backdrop-blur-sm rounded-full shadow px-3 py-1 text-[11px] text-slate-600 inline-flex items-center gap-1.5">
+    <div className="bg-fs-surface border border-fs-line backdrop-blur-sm rounded-full shadow px-3 py-1 text-[11px] text-fs-muted inline-flex items-center gap-1.5">
       <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
       Prices updated {label}
     </div>

@@ -19,6 +19,7 @@ import StationSparkline from "./StationSparkline";
 import AreaAverageLayer from "./AreaAverageLayer";
 import SaObligations from "./SaObligations";
 import FreshnessChip from "./FreshnessChip";
+import { useIsDarkTheme } from "@/lib/useIsDarkTheme";
 import "leaflet/dist/leaflet.css";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import "leaflet.markercluster/dist/MarkerCluster.css";
@@ -450,6 +451,7 @@ export default function MapView({
   const [selected, setSelected] = useState<{ id: string; lat: number; lng: number } | null>(null);
   const clusterRef = useRef<L.MarkerClusterGroup | null>(null);
   const markersById = useRef<Map<string, L.Marker>>(new Map());
+  const darkBasemap = useIsDarkTheme();
   const [brandFilter, setBrandFilter] = useState<string>("");
 
   const fetchStations = useCallback(
@@ -533,8 +535,9 @@ export default function MapView({
     <div className="relative h-full w-full flex">
     <MapContainer center={initialCenter} zoom={initialZoom} className="h-full flex-1 min-w-0">
       <TileLayer
+        key={darkBasemap ? "dark" : "light"}
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+        url={darkBasemap ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"}
       />
       <MapController
         onBoundsChange={fetchStations}

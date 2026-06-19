@@ -43,6 +43,12 @@ export const STYLE_DEFAULT_PALETTE: Record<ThemeStyle, string> = {
   util: "blueprint",
 };
 
+export const DARK_PALETTES = new Set<string>(["hivis", "terminal"]);
+
+export function isDarkPalette(id: string | null | undefined): boolean {
+  return !!id && DARK_PALETTES.has(id);
+}
+
 export const DEFAULT_THEME: ThemeChoice = {
   style: "friendly",
   palettes: { friendly: "teal", util: "blueprint" },
