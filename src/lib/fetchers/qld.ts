@@ -1,6 +1,7 @@
 import { Station, StationPrice } from "../types";
 import { QLD_FUEL_MAP, QLD_BRAND_MAP } from "../fuel-codes";
 import { isRealisticPrice } from "../price-sanity";
+import { normaliseBrand } from "../brands";
 
 const BASE_URL = "https://fppdirectapi-prod.fuelpricesqld.com.au";
 
@@ -49,8 +50,40 @@ async function fetchQLDPrices(): Promise<QLDPrice[]> {
   return data.SitePrices;
 }
 
+interface QLDBrand {
+  BrandId: number;
+  Name: string;
+}
+
+/**
+ * QLD's live brand reference (id -> name). The static QLD_BRAND_MAP only covers
+ * a handful of major chains, so independents/regionals previously rendered as
+ * "Brand <id>". Joining the reference resolves them all. Resilient: any failure
+ * falls back to the static map.
+ */
+async function fetchQLDBrands(): Promise<Map<number, string>> {
+  try {
+    const resp = await fetch(`${BASE_URL}/Subscriber/GetCountryBrands?countryId=21`, {
+      headers: getHeaders(),
+    });
+    if (!resp.ok) return new Map();
+    const data = await resp.json();
+    const map = new Map<number, string>();
+    for (const b of (data.Brands ?? []) as QLDBrand[]) {
+      if (typeof b.BrandId === "number" && b.Name) map.set(b.BrandId, b.Name);
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
 export async function fetchQLDStations(): Promise<Station[]> {
-  const [sites, prices] = await Promise.all([fetchQLDSites(), fetchQLDPrices()]);
+  const [sites, prices, apiBrands] = await Promise.all([
+    fetchQLDSites(),
+    fetchQLDPrices(),
+    fetchQLDBrands(),
+  ]);
 
   // Group prices by SiteId
   const priceMap = new Map<number, StationPrice[]>();
@@ -72,7 +105,7 @@ export async function fetchQLDStations(): Promise<Station[]> {
   return sites.map((site) => ({
     id: `qld-${site.S}`,
     name: site.N,
-    brand: QLD_BRAND_MAP[site.B] || `Brand ${site.B}`,
+    brand: normaliseBrand(apiBrands.get(site.B) ?? QLD_BRAND_MAP[site.B] ?? "Independent"),
     brandCode: String(site.B),
     address: site.A,
     suburb: "", // QLD API doesn't include suburb in site details

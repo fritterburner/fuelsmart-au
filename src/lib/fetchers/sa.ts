@@ -1,6 +1,7 @@
 import { Station, StationPrice } from "../types";
 import { SA_FUEL_MAP, SA_BRAND_MAP } from "../fuel-codes";
 import { isRealisticPrice } from "../price-sanity";
+import { normaliseBrand } from "../brands";
 
 /**
  * South Australia — Fuel Pricing Information Scheme via the Informed Sources
@@ -62,8 +63,35 @@ async function fetchSAPrices(): Promise<SAPrice[]> {
   return data.SitePrices;
 }
 
+interface SABrand {
+  BrandId: number;
+  Name: string;
+}
+
+/** SA brand reference (id -> name); mirrors qld.ts. Resilient to failure. */
+async function fetchSABrands(): Promise<Map<number, string>> {
+  try {
+    const resp = await fetch(`${BASE_URL}/Subscriber/GetCountryBrands?countryId=21`, {
+      headers: getHeaders(),
+    });
+    if (!resp.ok) return new Map();
+    const data = await resp.json();
+    const map = new Map<number, string>();
+    for (const b of (data.Brands ?? []) as SABrand[]) {
+      if (typeof b.BrandId === "number" && b.Name) map.set(b.BrandId, b.Name);
+    }
+    return map;
+  } catch {
+    return new Map();
+  }
+}
+
 export async function fetchSAStations(): Promise<Station[]> {
-  const [sites, prices] = await Promise.all([fetchSASites(), fetchSAPrices()]);
+  const [sites, prices, apiBrands] = await Promise.all([
+    fetchSASites(),
+    fetchSAPrices(),
+    fetchSABrands(),
+  ]);
 
   const priceMap = new Map<number, StationPrice[]>();
   for (const p of prices) {
@@ -83,7 +111,7 @@ export async function fetchSAStations(): Promise<Station[]> {
   return sites.map((site) => ({
     id: `sa-${site.S}`,
     name: site.N,
-    brand: SA_BRAND_MAP[site.B] || `Brand ${site.B}`,
+    brand: normaliseBrand(apiBrands.get(site.B) ?? SA_BRAND_MAP[site.B] ?? "Independent"),
     brandCode: String(site.B),
     address: site.A,
     suburb: "",
