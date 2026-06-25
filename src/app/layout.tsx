@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Baloo_2, Nunito, IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 import UsageBeacon from "@/components/UsageBeacon";
+import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -15,6 +16,8 @@ const plexMono = IBM_Plex_Mono({ variable: "--font-plex-mono", subsets: ["latin"
 export const metadata: Metadata = {
   title: "FuelSmart AU",
   description: "Find cheapest fuel prices across Australia",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "FuelSmart" },
   other: {
     // Stops Chrome/Edge offering to translate the page. Our UI is short
     // labels + numbers that CLD3 routinely misclassifies as German.
@@ -28,6 +31,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
+  themeColor: "#0FB39A",
 };
 
 // Applies the saved theme before paint so there's no flash. Defaults (set
@@ -51,6 +55,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
         {children}
         <UsageBeacon />
+        <ServiceWorkerRegister />
       </body>
     </html>
   );

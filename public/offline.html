@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Offline — FuelSmart AU</title>
+<style>
+  html,body{height:100%;margin:0}
+  body{display:flex;align-items:center;justify-content:center;background:#EEF8F4;color:#1E2A2A;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;padding:24px}
+  .card{max-width:340px;text-align:center}
+  .logo{width:72px;height:72px;border-radius:20px;background:#0FB39A;display:inline-flex;align-items:center;justify-content:center;margin-bottom:18px}
+  h1{font-size:20px;margin:0 0 8px}
+  p{font-size:14px;line-height:1.6;color:#6E8480;margin:0 0 20px}
+  button{font:inherit;font-size:14px;font-weight:600;background:#0FB39A;color:#fff;border:none;border-radius:999px;padding:10px 22px;cursor:pointer}
+  button:active{opacity:.9}
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <svg width="40" height="40" viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M32 13 C32 13 46 31 46 40 a14 14 0 0 1 -28 0 C18 31 32 13 32 13 Z" fill="#ffffff"/>
+      </svg>
+    </div>
+    <h1>You're offline</h1>
+    <p>FuelSmart needs a connection to show live fuel prices. Check your network and try again.</p>
+    <button onclick="location.reload()">Try again</button>
+  </div>
+</body>
+</html>
