@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Baloo_2, Nunito, IBM_Plex_Sans, IBM_Plex_Mono } from
 import "./globals.css";
 import UsageBeacon from "@/components/UsageBeacon";
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
+import { SITE_URL } from "@/lib/site";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -14,6 +15,7 @@ const plex = IBM_Plex_Sans({ variable: "--font-plex", subsets: ["latin"], weight
 const plexMono = IBM_Plex_Mono({ variable: "--font-plex-mono", subsets: ["latin"], weight: ["500", "600"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: "FuelSmart AU",
   description: "Find cheapest fuel prices across Australia",
   manifest: "/manifest.webmanifest",
