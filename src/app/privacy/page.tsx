@@ -71,6 +71,51 @@ export default function PrivacyPage() {
           </p>
         </section>
 
+        <section className="rounded-lg border border-gray-200 bg-white shadow-sm p-4">
+          <h2 className="text-base font-bold text-gray-900 mb-2">
+            Price alerts (optional)
+          </h2>
+          <p>
+            If you turn on <Link href="/alerts" className="underline text-blue-700">price
+            alerts</Link>, we store a bit more against that same random device ID —
+            still no account, still no name or email:
+          </p>
+          <ul className="list-disc pl-5 mt-1 space-y-1">
+            <li>
+              your browser&apos;s <strong>push subscription</strong> (an address the
+              browser gives us so we can wake up your device — we can&apos;t read
+              anything else about you from it);
+            </li>
+            <li>
+              the <strong>alerts you set</strong> — a fuel type, a target price, and
+              either a specific station or a state, so we know what to check and
+              when to notify you.
+            </li>
+          </ul>
+          <p className="mt-2">
+            Every 15 minutes or so, after we refresh fuel prices, we check whether
+            any alert&apos;s target has been reached and — if so — send one push
+            notification and wait 24 hours before sending another for that same
+            alert. We never sell or share this data, and it&apos;s never linked to
+            your identity, IP address, or any other FuelSmart data.
+          </p>
+          <p className="mt-2">
+            <strong>Retention:</strong> removing an alert deletes it immediately.
+            Turning notifications off removes your push subscription and every
+            alert on that device at the same time. If your browser reports that a
+            push subscription no longer exists (e.g. you uninstalled the app or
+            it expired), we delete it automatically the next time we try to use
+            it — no action needed from you.
+          </p>
+          <p className="mt-2 text-xs text-gray-500">
+            Trade-off worth knowing: there&apos;s no login, so the random device ID
+            itself is what proves an alert request is &quot;yours&quot; — anyone who
+            somehow obtained that ID could see or change that device&apos;s alerts.
+            It&apos;s never displayed, logged, or sent anywhere except back to our
+            alerts API, and it&apos;s the same 122-bit random ID described above.
+          </p>
+        </section>
+
         <section>
           <h2 className="text-base font-bold text-gray-900 mb-2">
             Turning it off
@@ -79,6 +124,8 @@ export default function PrivacyPage() {
             Clearing your browser storage for this site removes the random ID and
             all saved settings. Private/incognito windows aren&apos;t counted
             across days, and if storage is blocked the ping simply never fires.
+            Turning off price alerts (or clearing storage) removes your push
+            subscription and alert list from our servers as described above.
           </p>
         </section>
 
