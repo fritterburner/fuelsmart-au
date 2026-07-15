@@ -64,12 +64,20 @@ const STATES: StateEntry[] = [
       "Similar self-report model to NT. Updates are generally prompt but not legally enforced on a fixed cadence.",
   },
   {
-    code: "SA / VIC",
-    label: "South Australia, Victoria",
-    source: "Integration in progress",
-    cadence: "Coming soon",
+    code: "VIC",
+    label: "Victoria",
+    source: "Fair Fuel Open Data API (Servo Saver)",
+    cadence: "24-hour delayed",
     detail:
-      "Both now run official price-reporting schemes we're connecting to: Victoria's Servo Saver Open API (24-hour delayed tier) and South Australia's Fuel Pricing Information Scheme. Until those feeds are live, the map stays empty through these regions — we'd rather show nothing than stale guesses.",
+      "Victoria's official open-data tier is deliberately delayed by 24 hours, so VIC pins show yesterday's confirmed prices — each pin's own timestamp tells you exactly how old it is. Data © State of Victoria, accessed via the Victorian Government Service Victoria Platform (CC BY 4.0).",
+  },
+  {
+    code: "SA",
+    label: "South Australia",
+    source: "SA Fuel Pricing Information Scheme",
+    cadence: "Near real-time",
+    detail:
+      "Retailers must report price changes within 30 minutes under SA's mandatory scheme. This feed is newly connected — if you spot a price that doesn't match the board, the station's own timestamp and the report-a-problem link below are your friends.",
   },
 ];
 
@@ -152,15 +160,15 @@ export default function DataFreshnessPage() {
         {/* Coverage caveat */}
         <section className="rounded-lg border border-amber-200 bg-amber-50 p-4">
           <h2 className="text-sm font-bold text-amber-900 mb-1">
-            Why some regions show as empty
+            National coverage, with one honest caveat
           </h2>
           <p className="text-xs text-amber-900 leading-relaxed">
-            SA and VIC feeds aren&apos;t live in the app yet, so the map shows no
-            pins through those two states for now. Rather than fake it with
-            guesses or out-of-date data, we show nothing until the official feeds
-            are connected. If you plan a trip that passes through them, the Trip
-            Planner will warn you before routing. (ACT is covered — it shares the
-            NSW FuelCheck feed.)
+            All eight states and territories are now connected to their official
+            feeds. Victoria&apos;s public feed is 24-hour delayed by design (see
+            above), so treat VIC prices as yesterday&apos;s confirmed board
+            prices rather than this morning&apos;s. If a whole state ever shows
+            empty, its feed is having an outage — the per-state timestamps above
+            will show it, and pins return automatically once the feed recovers.
           </p>
         </section>
 

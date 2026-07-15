@@ -16,3 +16,15 @@ export const SA_ATTRIBUTION =
 
 /** Where SA consumers can report a price that isn't current (licence cl. 3.3). */
 export const SA_COMPLAINT_CONTACT = "FuelPricingScheme@sa.gov.au";
+
+/**
+ * Mandatory verbatim notice for the VIC Fair Fuel Open Data API ("Servo
+ * Saver"), Service Victoria — CC BY 4.0 licence. Must appear on any copy of
+ * VIC data, however reformatted (same obligation shape as SA_ATTRIBUTION).
+ *
+ * NOTE: the public tier is 24-hour delayed. Don't pair this string with any
+ * "live" framing — per-price `updatedAt` timestamps already convey the delay
+ * honestly, so no separate delay caveat is baked into this constant.
+ */
+export const VIC_ATTRIBUTION =
+  "© State of Victoria accessed via the Victorian Government Service Victoria Platform";

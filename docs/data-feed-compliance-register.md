@@ -16,20 +16,26 @@
 | **WA FuelWatch** | WA FuelWatch terms | Attribute; make clear the 24-hour-ahead / locked-price nature. | ✅ Attributed + 24h cadence explained. |
 | **NT MyFuel** | NT open data | Attribute; show currency. | ✅ Attributed. |
 | **TAS FuelCheck** | TAS FuelCheck | Attribute; show currency. | ✅ Attributed. |
+| **VIC Fair Fuel Open Data API** ("Servo Saver") | Service Victoria, CC BY 4.0 | Mandatory attribution notice; public tier is **24-hour delayed** — never present as live. | ⚠ Code built to spec (`src/lib/fetchers/vic.ts`); `VIC_ATTRIBUTION` constant added in `src/lib/attribution.ts`; **not yet wired into a UI component** (see note below) — dormant until `VIC_SERVO_SAVER_API_KEY` is set. |
 
 General posture that already helps us comply: per-pin "last reported" timestamps, honest per-state cadence on `/data-freshness`, no claim of official endorsement, no resale.
 
 ---
 
-## VIC — Servo Saver Open API (pre-build)
+## VIC — Fair Fuel Open Data API ("Servo Saver") — SPEC CONFIRMED (Service Victoria PDF, v1.0, Oct 2025)
 
-- **Access:** free; requires an approved **API Consumer ID**. Applied for (awaiting callback).
-- **Terms:** must accept **Servo Saver Open API Terms & Acceptable Use policy** at application; subject to **rate limits**.
-- **Obligations to honour in code:**
-  - Display the **24-hour delay** honestly (treat like WA — never present a delayed price as live). Wire the feed `as_of` into the pin timestamp.
-  - Respect rate limits (nightly cron + cache already does; confirm against documented limits once we have the key).
-  - Attribute Service Victoria / Victorian Government on `/data-freshness`.
-- **To confirm on approval:** exact JSON shape, documented rate limit, any attribution wording they mandate.
+The public spec (endpoints, headers, response shape, rate limit, licence) is now confirmed and the fetcher (`src/lib/fetchers/vic.ts`) is built against it. Only the **API Consumer ID** itself is pending.
+
+- **Access:** free; requires an approved **API Consumer ID** (env `VIC_SERVO_SAVER_API_KEY`). Applied for (awaiting callback).
+- **Base URL:** `https://api.fuel.service.vic.gov.au/open-data/v1` (override via `VIC_SERVO_SAVER_URL` if it changes).
+- **Auth:** `x-consumer-id: <key>` (lowercase) + a fresh `x-transactionid` (client-generated UUIDv4) on every request + mandatory `User-Agent`. All three are set by the fetcher.
+- **Rate limit:** 10 requests/60s. The fetcher makes at most 2 calls per refresh (prices + brands reference) — well under the limit; commented in code.
+- **Licence:** **CC BY 4.0**. Mandatory notice, verbatim: *"© State of Victoria accessed via the Victorian Government Service Victoria Platform"* — now exported as `VIC_ATTRIBUTION` in `src/lib/attribution.ts`, following the same pattern as `SA_ATTRIBUTION`.
+- **Obligations honoured in code:**
+  - **24-hour delay:** the public tier is 24-hour-delayed. The fetcher never fabricates a "live" timestamp — each `StationPrice.updated` comes straight from the feed's own `updatedAt`, so the existing per-pin "last reported" display already conveys the delay honestly (same treatment as WA). `/data-freshness` should be updated to state the 24h delay explicitly once the feed goes live (currently says "Coming soon" — see go-live doc).
+  - **Rate limits:** respected by construction (2 calls/refresh vs. 10/60s budget); 403 and 429 responses are surfaced as distinct, actionable error messages rather than a generic failure.
+  - **Attribution:** `VIC_ATTRIBUTION` constant exists and is ready to render, but **is not yet wired into a UI component** — `SaObligations.tsx` is SA-specific (gated on `station.state !== "SA"`) and `MapView.tsx` only renders it for SA pins. Wiring VIC in (either a parallel `VicAttribution.tsx` or extending `SaObligations.tsx` to handle both states) is a small follow-up UI change, out of scope for this pass — see `docs/go-live-sa-vic.md`.
+- **No longer to confirm:** JSON shape, header names, endpoint paths, rate limit — all now spec-confirmed. Only the actual key/credential and a live-response smoke test remain.
 
 ---
 
@@ -38,6 +44,8 @@ General posture that already helps us comply: per-pin "last reported" timestamps
 Source: licence PDF supplied by Fred (`safuelpricinginformation.com.au/documents/TermsandConditions.pdf`). Access still gated on the data-publisher application/callback, but the terms are now known.
 
 **Cost:** nominal **$1.10 (GST inclusive), payable on demand** (cl. 2.3). Effectively a peppercorn — not a commercial fee. Data must be **free to consumers** (cl. 2.4).
+
+**Code hardening (this pass):** `SA_FPIS_COUNTRY_ID`, `SA_FPIS_GEOREGION_LEVEL`, `SA_FPIS_GEOREGION_ID` are now separate env overrides (`src/lib/fetchers/sa.ts`) — go-live only needs env changes, not a code change, once the real SA tenant ids are known. The fetcher also runs a defensive SA bounding-box filter on returned sites and throws (surfacing in the cron's `errors[]`) if the majority fall outside SA, to catch the still-unconfirmed `countryId`/`geoRegionId` accidentally pointing at another state's tenant. Fuel-type ids self-correct at runtime via `GetCountryFuelTypes` with a tolerant name matcher, falling back to the static QLD-derived map.
 
 **Obligations to build:**
 - **Attribution (cl. 3.1):** show on any copy of the data — *"Based on or contains data provided by the State of South Australia (Office of Consumer and Business Services) 2021-2023. Copyright of the State of South Australia."* (Confirm the year range is current with CBS.)

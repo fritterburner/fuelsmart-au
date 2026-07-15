@@ -77,34 +77,33 @@ export const NT_BRAND_MAP: Record<string, string> = {
   SO: "Solo", UN: "United",
 };
 
-// --- VIC (Servo Saver) + SA (Informed Sources) — national-coverage additions ---
+// --- VIC (Fair Fuel Open Data API / Servo Saver) + SA (Informed Sources) ---
 
-// Servo Saver returns fuel-type labels; map the ones we support. Confirm the
-// exact label spellings against a live response when the API key is issued.
+// Fair Fuel Open Data API v1.0 (Service Victoria, Oct 2025 spec) fuel-type
+// codes from GET /fuel/prices' fuelPrices[].fuelType. B20, LNG and CNG have no
+// corresponding FuelCode in this app (see types.ts) — they're deliberately
+// left unmapped so vic.ts's `VIC_FUEL_MAP[code]` lookup returns undefined and
+// the fetcher skips those rows rather than inventing a new FuelCode.
 export const VIC_FUEL_MAP: Record<string, FuelCode> = {
-  ULP: "U91",
-  Unleaded: "U91",
-  "Unleaded 91": "U91",
-  E10: "E10",
-  "PULP 95": "P95",
-  "Premium 95": "P95",
+  U91: "U91",
   P95: "P95",
-  "PULP 98": "P98",
-  "Premium 98": "P98",
   P98: "P98",
-  Diesel: "DL",
-  DL: "DL",
-  "Premium Diesel": "PD",
-  PD: "PD",
-  LPG: "LPG",
+  DSL: "DL",
+  PDSL: "PD",
+  E10: "E10",
   E85: "E85",
+  LPG: "LPG",
+  // B20, LNG, CNG: intentionally unmapped (no matching FuelCode).
 };
 
 // SA is aggregated by Informed Sources — the same operator as QLD — so it uses
-// the same numeric FuelId scheme. Reusing the QLD map is the best-grounded
-// default; confirm on publisher approval.
+// the same numeric FuelId scheme in principle, but SA's own FuelId table is
+// unconfirmed. sa.ts fetches GetCountryFuelTypes at runtime and matches fuel
+// names to FuelCodes, falling back to this static map (identical to QLD's)
+// only when the live lookup doesn't resolve an id.
 export const SA_FUEL_MAP: Record<number, FuelCode> = QLD_FUEL_MAP;
 
 // SA brand-ID -> name. Populate from a live GetFullSiteDetails response on
-// approval; unknown IDs fall back to "Brand <id>" and still render.
+// approval; unknown IDs fall back to "Independent" and still render (sa.ts
+// also joins the live GetCountryBrands reference first).
 export const SA_BRAND_MAP: Record<number, string> = {};
