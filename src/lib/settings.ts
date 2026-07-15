@@ -1,5 +1,12 @@
 import { FuelCode } from "./types";
 
+/**
+ * BOARD = the raw price the sign/pump shows. EFFECTIVE = board price after
+ * the user's configured loyalty/membership discounts (see `src/lib/discounts.ts`).
+ * Drives the map's price-mode toggle — see `src/components/PriceModeToggle.tsx`.
+ */
+export type PriceMode = "board" | "effective";
+
 export interface UserSettings {
   defaultFuel: FuelCode;
   tankSize: number;
@@ -21,6 +28,14 @@ export interface UserSettings {
    * neutral gray middle) is derived from this count — see `rank-palette.ts`.
    */
   cheapestHighlightCount: number;
+  /**
+   * Map price display: "effective" (default, preserves prior behaviour) shows
+   * prices after the user's active discounts; "board" shows raw pump/sign
+   * prices with no discount adjustment. Only meaningfully different from
+   * "effective" when the user has at least one enabled discount — see
+   * `hasActiveDiscounts` in `src/lib/useDiscounts.ts`.
+   */
+  priceMode: PriceMode;
 }
 
 const STORAGE_KEY = "fuelsmart-settings";
@@ -35,6 +50,7 @@ const DEFAULTS: UserSettings = {
   homeLabel: "",
   exciseMode: false,
   cheapestHighlightCount: 3,
+  priceMode: "effective",
 };
 
 export function loadSettings(): UserSettings {

@@ -90,7 +90,7 @@ export default function BottomSheet({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="inline-flex items-center justify-center min-w-[40px] min-h-[40px] rounded-lg text-slate-500 active:bg-slate-100"
+            className="inline-flex items-center justify-center min-w-[40px] min-h-[40px] rounded-lg text-slate-500 active:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fs-accent"
           >
             <svg
               className="h-5 w-5"

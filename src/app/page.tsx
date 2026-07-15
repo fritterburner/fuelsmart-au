@@ -9,11 +9,13 @@ import LocationSearch from "@/components/LocationSearch";
 import ExciseToggle from "@/components/ExciseToggle";
 import ExciseStatusBar from "@/components/ExciseStatusBar";
 import DiscountNudge from "@/components/DiscountNudge";
+import PriceModeToggle from "@/components/PriceModeToggle";
 import BottomSheet from "@/components/BottomSheet";
 import { FuelCode } from "@/lib/types";
 import { FUEL_TYPES } from "@/lib/fuel-codes";
-import { loadSettings, saveSettings } from "@/lib/settings";
+import { loadSettings, saveSettings, type PriceMode } from "@/lib/settings";
 import { useMarketData } from "@/lib/useMarketData";
+import { useDiscounts, hasActiveDiscounts } from "@/lib/useDiscounts";
 import { EXCISE_ENABLED } from "@/lib/features";
 
 // Leaflet must be loaded client-side only (no SSR)
@@ -27,16 +29,41 @@ export default function Home() {
   const [searchSheetOpen, setSearchSheetOpen] = useState(false);
   const [exciseMode, setExciseMode] = useState(false);
   const [cheapestHighlightCount, setCheapestHighlightCount] = useState(3);
+  const [priceMode, setPriceMode] = useState<PriceMode>("effective");
+  const [deepLinkStation, setDeepLinkStation] = useState<{ id: string; lat: number; lng: number } | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { discounts } = useDiscounts();
 
-  // Hydrate excise-mode + palette preference from localStorage
+  // Hydrate excise-mode + palette + price-mode preference from localStorage
   useEffect(() => {
     function hydrate() {
       const s = loadSettings();
       setExciseMode(EXCISE_ENABLED && s.exciseMode);
       setCheapestHighlightCount(s.cheapestHighlightCount);
+      setPriceMode(s.priceMode);
     }
     hydrate();
+  }, []);
+
+  // Deep link: ?station=<id> — look up its coordinates and hand them to
+  // MapView, which centres on it and opens its popup (same mechanism as
+  // picking a station from the sidebar).
+  useEffect(() => {
+    const stationId = new URLSearchParams(window.location.search).get("station");
+    if (!stationId) return;
+    let active = true;
+    fetch(`/api/station/${encodeURIComponent(stationId)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!active || !data?.station) return;
+        setDeepLinkStation({ id: data.station.id, lat: data.station.lat, lng: data.station.lng });
+      })
+      .catch(() => {
+        /* bad/unknown id in the URL — ignore, map just loads normally */
+      });
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Live oil + AUD via /api/market-data (only fetch when excise mode is on)
@@ -48,6 +75,12 @@ export default function Home() {
     const current = loadSettings();
     saveSettings({ ...current, exciseMode: next });
     setMenuOpen(false);
+  }
+
+  function handlePriceModeChange(next: PriceMode) {
+    setPriceMode(next);
+    const current = loadSettings();
+    saveSettings({ ...current, priceMode: next });
   }
 
   useEffect(() => {
@@ -153,6 +186,18 @@ export default function Home() {
               <span aria-hidden="true">📈</span> 30-day price history
             </a>
             <a
+              href="/trends"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-fs-bg transition-colors"
+            >
+              <span aria-hidden="true">🗺️</span> National trends
+            </a>
+            <a
+              href="/alerts"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-fs-bg transition-colors"
+            >
+              <span aria-hidden="true">🔔</span> Price alerts
+            </a>
+            <a
               href="/additives"
               className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-fs-bg transition-colors"
             >
@@ -163,6 +208,12 @@ export default function Home() {
               className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-fs-bg transition-colors"
             >
               <span aria-hidden="true">💳</span> Discounts &amp; loyalty
+            </a>
+            <a
+              href="/logbook"
+              className="flex items-center gap-2 px-4 py-2.5 text-sm hover:bg-fs-bg transition-colors"
+            >
+              <span aria-hidden="true">📒</span> Fuel logbook
             </a>
             <a
               href="/settings"
@@ -191,6 +242,9 @@ export default function Home() {
           marketData={marketData}
           marketOverride={override}
           cheapestHighlightCount={cheapestHighlightCount}
+          deepLinkStation={deepLinkStation}
+          priceMode={priceMode}
+          onPriceModeChange={handlePriceModeChange}
         />
       </div>
 
@@ -206,7 +260,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setFuelSheetOpen(true)}
-              className="inline-flex items-center gap-1 min-h-[40px] px-3 rounded-lg bg-emerald-600 active:bg-emerald-700 text-sm font-medium transition-colors"
+              className="inline-flex items-center gap-1 min-h-[40px] px-3 rounded-lg bg-emerald-600 active:bg-emerald-700 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fs-accent"
               aria-label={`Fuel type: ${selectedFuel?.name ?? fuel}. Tap to change.`}
             >
               <span>{selectedFuel?.short ?? fuel}</span>
@@ -217,7 +271,7 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setSearchSheetOpen(true)}
-              className="inline-flex items-center justify-center min-w-[40px] min-h-[40px] rounded-lg bg-slate-700 active:bg-slate-600 transition-colors"
+              className="inline-flex items-center justify-center min-w-[40px] min-h-[40px] rounded-lg bg-slate-700 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fs-accent"
               aria-label="Search location"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -230,7 +284,7 @@ export default function Home() {
               <button
                 type="button"
                 onClick={() => setMenuOpen((p) => !p)}
-                className="inline-flex items-center justify-center min-w-[40px] min-h-[40px] rounded-lg bg-slate-700 active:bg-slate-600 transition-colors"
+                className="inline-flex items-center justify-center min-w-[40px] min-h-[40px] rounded-lg bg-slate-700 active:bg-slate-600 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fs-accent"
                 aria-label="Menu"
                 aria-expanded={menuOpen}
               >
@@ -264,6 +318,15 @@ export default function Home() {
                       variant="mobile-menu"
                     />
                   </div>
+                  {hasActiveDiscounts(discounts) && (
+                    <div role="none" className="border-t border-slate-600">
+                      <PriceModeToggle
+                        mode={priceMode}
+                        onChange={handlePriceModeChange}
+                        variant="mobile-menu"
+                      />
+                    </div>
+                  )}
                   {EXCISE_ENABLED && (
 <a
                     role="menuitem"
@@ -290,6 +353,20 @@ export default function Home() {
                   </a>
                   <a
                     role="menuitem"
+                    href="/trends"
+                    className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                  >
+                    <span aria-hidden="true">🗺️</span> National trends
+                  </a>
+                  <a
+                    role="menuitem"
+                    href="/alerts"
+                    className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                  >
+                    <span aria-hidden="true">🔔</span> Price alerts
+                  </a>
+                  <a
+                    role="menuitem"
                     href="/additives"
                     className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
                   >
@@ -302,6 +379,13 @@ export default function Home() {
                     className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors border-t border-slate-600"
                   >
                     <span aria-hidden="true">💳</span> Discounts &amp; loyalty
+                  </a>
+                  <a
+                    role="menuitem"
+                    href="/logbook"
+                    className="flex items-center gap-2 px-4 py-3 text-sm hover:bg-slate-600 active:bg-slate-600 transition-colors"
+                  >
+                    <span aria-hidden="true">📒</span> Fuel logbook
                   </a>
                   <a
                     role="menuitem"

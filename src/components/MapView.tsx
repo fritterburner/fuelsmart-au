@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef, type RefObject } from "react"
 import { MapContainer, TileLayer, Marker, Popup, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import { Station, FuelCode } from "@/lib/types";
-import { nearestBaseline } from "@/lib/excise/nearest-baseline";
+import { nearestBaseline, haversineKm } from "@/lib/excise/nearest-baseline";
 import { calcVerdict } from "@/lib/excise/calc";
 import { toFuelBucket } from "@/lib/excise/fuel-buckets";
 import type { Verdict, MarketData } from "@/lib/excise/types";
@@ -12,13 +12,19 @@ import { assignRankColors } from "@/lib/rank-palette";
 import { formatAge } from "@/lib/time-format";
 import { applyToStation } from "@/lib/discounts";
 import type { Discount } from "@/lib/discounts";
-import { useDiscounts, loadDiscounts, saveDiscounts } from "@/lib/useDiscounts";
+import { useDiscounts, loadDiscounts, saveDiscounts, hasActiveDiscounts } from "@/lib/useDiscounts";
+import type { PriceMode } from "@/lib/settings";
 import StationExcisePopup from "./StationExcisePopup";
 import StationNavLinks from "./StationNavLinks";
 import StationSparkline from "./StationSparkline";
 import AreaAverageLayer from "./AreaAverageLayer";
 import SaObligations from "./SaObligations";
 import FreshnessChip from "./FreshnessChip";
+import FavouriteStar from "./FavouriteStar";
+import ShareStationButton from "./ShareStationButton";
+import AlertBell from "./AlertBell";
+import PriceModeToggle from "./PriceModeToggle";
+import { useFavourites } from "@/lib/favourites";
 import { useIsDarkTheme } from "@/lib/useIsDarkTheme";
 import "leaflet/dist/leaflet.css";
 import MarkerClusterGroup from "react-leaflet-cluster";
@@ -126,9 +132,12 @@ function loadMapPosition(): { lat: number; lng: number; zoom: number } | null {
 
 function MapController({
   onBoundsChange,
+  onCenterChange,
   fuel,
 }: {
   onBoundsChange: (bounds: string) => void;
+  /** Optional: reports the map's current centre, used as the distance-sort fallback origin. */
+  onCenterChange?: (center: { lat: number; lng: number }) => void;
   fuel: FuelCode;
 }) {
   const map = useMap();
@@ -140,6 +149,7 @@ function MapController({
     moveend: () => {
       saveMapPosition(map);
       onBoundsChange(getBoundsString(map));
+      onCenterChange?.(map.getCenter());
     },
   });
 
@@ -152,7 +162,10 @@ function MapController({
     if (saved) {
       // Already positioned from saved state (MapContainer initial center)
       // Just trigger station fetch
-      const timer = setTimeout(() => onBoundsChange(getBoundsString(map)), 200);
+      const timer = setTimeout(() => {
+        onBoundsChange(getBoundsString(map));
+        onCenterChange?.(map.getCenter());
+      }, 200);
       return () => clearTimeout(timer);
     }
 
@@ -166,19 +179,24 @@ function MapController({
         () => {
           // Denied or unavailable — stay at fallback, just fetch
           onBoundsChange(getBoundsString(map));
+          onCenterChange?.(map.getCenter());
         },
         { timeout: 5000 }
       );
     } else {
       onBoundsChange(getBoundsString(map));
+      onCenterChange?.(map.getCenter());
     }
-  }, [map, onBoundsChange]);
+  }, [map, onBoundsChange, onCenterChange]);
 
   // Fetch on initial mount (for saved-position case where geolocation doesn't fire)
   useEffect(() => {
-    const timer = setTimeout(() => onBoundsChange(getBoundsString(map)), 200);
+    const timer = setTimeout(() => {
+      onBoundsChange(getBoundsString(map));
+      onCenterChange?.(map.getCenter());
+    }, 200);
     return () => clearTimeout(timer);
-  }, [map, onBoundsChange]);
+  }, [map, onBoundsChange, onCenterChange]);
 
   // Re-fetch when fuel type changes
   useEffect(() => {
@@ -241,7 +259,11 @@ function SelectionLayer({
     const group = clusterRef.current;
     const marker = markersById.current?.get(selected.id);
     if (group && marker) {
-      group.zoomToShowLayer(marker, () => map.panTo([selected.lat, selected.lng]));
+      group.zoomToShowLayer(marker, () => {
+        map.panTo([selected.lat, selected.lng]);
+        // Reveal the popup too — sidebar picks and deep links both land here.
+        marker.openPopup();
+      });
     } else {
       map.flyTo([selected.lat, selected.lng], Math.max(map.getZoom(), 15));
     }
@@ -274,16 +296,31 @@ interface Props {
   marketOverride?: { brent_usd: number; aud_usd: number } | null;
   /** Default-mode palette: number of cheapest visible stations to highlight green. */
   cheapestHighlightCount?: number;
+  /**
+   * Set on load when the URL has `?station=<id>` (resolved by page.tsx via
+   * `/api/station/[id]`). Centres the map on it and opens its popup, reusing
+   * the same selection mechanism as a sidebar row click.
+   */
+  deepLinkStation?: { id: string; lat: number; lng: number } | null;
+  /**
+   * BOARD vs EFFECTIVE price display — lifted to page.tsx (like `exciseMode`)
+   * so it can also be toggled from the mobile kebab menu, which lives outside
+   * this component. Defaults to "effective" to preserve prior behaviour.
+   */
+  priceMode?: PriceMode;
+  onPriceModeChange?: (next: PriceMode) => void;
 }
 
 function StationPricePopupContent({
   station,
   priceEntry,
   activeDiscounts,
+  priceMode,
 }: {
   station: Station;
   priceEntry: { fuel: FuelCode; price: number; updated: string };
   activeDiscounts: Discount[];
+  priceMode: PriceMode;
 }) {
   const [editing, setEditing] = useState(false);
   const [cplOff, setCplOff] = useState<string>("4");
@@ -324,11 +361,32 @@ function StationPricePopupContent({
 
   return (
     <div className="text-sm">
-      <strong>{station.name}</strong>
-      <br />
+      <div className="flex items-start justify-between gap-2">
+        <strong>{station.name}</strong>
+        <FavouriteStar stationId={station.id} className="min-w-[28px] min-h-[28px] text-lg -mt-1 -mr-1" />
+      </div>
       {station.address}, {station.suburb} {station.state} {station.postcode}
+      <div className="mt-1 flex items-center gap-2 flex-wrap">
+        <ShareStationButton stationId={station.id} stationName={station.name} />
+        <AlertBell
+          stationId={station.id}
+          stationName={station.name}
+          fuel={priceEntry.fuel}
+          currentPriceCpl={priceEntry.price}
+        />
+      </div>
       <hr className="my-1" />
       {station.prices.map((p) => {
+        if (priceMode === "board") {
+          return (
+            <div key={p.fuel} className="flex justify-between items-start gap-4">
+              <span>{p.fuel}</span>
+              <span className="text-right">
+                <strong>{p.price.toFixed(1)} c/L</strong>
+              </span>
+            </div>
+          );
+        }
         const eff = applyToStation(station, p.price, activeDiscounts);
         const hasDiscount = eff.applied.length > 0;
         return (
@@ -350,11 +408,19 @@ function StationPricePopupContent({
       })}
       <div className="text-xs text-gray-500 mt-1">
         Updated {formatAge(priceEntry.updated)}
-        {activeDiscounts.some((d) => d.enabled) && (
+        {priceMode === "effective" && activeDiscounts.some((d) => d.enabled) && (
           <span className="block text-[11px] text-emerald-700">
             Showing price after your saved discounts.{" "}
             <a href="/discounts" className="underline">
               Change
+            </a>
+          </span>
+        )}
+        {priceMode === "board" && activeDiscounts.some((d) => d.enabled) && (
+          <span className="block text-[11px] text-gray-500">
+            Showing board price.{" "}
+            <a href="/discounts" className="underline">
+              See with discounts
             </a>
           </span>
         )}
@@ -440,6 +506,9 @@ export default function MapView({
   marketData = null,
   marketOverride = null,
   cheapestHighlightCount = 3,
+  deepLinkStation = null,
+  priceMode = "effective",
+  onPriceModeChange,
 }: Props) {
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(false);
@@ -453,6 +522,52 @@ export default function MapView({
   const markersById = useRef<Map<string, L.Marker>>(new Map());
   const darkBasemap = useIsDarkTheme();
   const [brandFilter, setBrandFilter] = useState<string>("");
+  const { favourites } = useFavourites();
+  const [favouritesOnly, setFavouritesOnly] = useState(false);
+  const [sortMode, setSortMode] = useState<"price" | "distance">("price");
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(() => {
+    const saved = loadMapPosition();
+    return saved ? { lat: saved.lat, lng: saved.lng } : null;
+  });
+  const [geoOrigin, setGeoOrigin] = useState<{ lat: number; lng: number } | null>(null);
+  const [geoStatus, setGeoStatus] = useState<"idle" | "locating" | "denied">("idle");
+  const deepLinkOpened = useRef(false);
+
+  // "Near me" — geolocation is only ever requested from this explicit button
+  // press, never automatically (unlike MapController's initial-position fix).
+  function handleUseMyLocation() {
+    if (!navigator.geolocation) return;
+    setGeoStatus("locating");
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeoOrigin({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        setGeoStatus("idle");
+      },
+      () => setGeoStatus("denied"),
+      { timeout: 8000 }
+    );
+  }
+
+  // Deep link (?station=<id>, resolved by page.tsx): centre + halo immediately
+  // using the coordinates already looked up via /api/station/[id] — reuses the
+  // same `selected` mechanism as a sidebar row click, so it works even before
+  // this station appears in the bounds-fetched `stations` list.
+  useEffect(() => {
+    if (!deepLinkStation) return;
+    setSelected({ id: deepLinkStation.id, lat: deepLinkStation.lat, lng: deepLinkStation.lng });
+  }, [deepLinkStation]);
+
+  // Once the deep-linked station's marker actually mounts (its bounds fetch
+  // has to complete first), open its popup. Re-checked whenever `stations`
+  // changes; a ref stops it from re-opening after the user closes it.
+  useEffect(() => {
+    if (!deepLinkStation || deepLinkOpened.current) return;
+    const marker = markersById.current.get(deepLinkStation.id);
+    if (marker) {
+      marker.openPopup();
+      deepLinkOpened.current = true;
+    }
+  }, [deepLinkStation, stations]);
 
   const fetchStations = useCallback(
     async (bounds: string) => {
@@ -478,13 +593,23 @@ export default function MapView({
     [fuel]
   );
 
-  // Compute effective price (post-discount) per station, then rank by that
-  // and remember which stations had a discount applied so we can ring them.
+  // Compute the DISPLAYED price (board or post-discount effective, depending
+  // on `priceMode`) per station, then rank by that and remember which
+  // stations had a discount applied so we can ring them. Pins, cluster
+  // bubbles, sidebar prices, sort order and rank colouring all read from this
+  // same map, so a station can never show a rank colour or sort position
+  // that disagrees with its displayed price.
   const displayFuel = activeFuel;
+  const showPriceModeToggle = hasActiveDiscounts(activeDiscounts);
   const pricedStations = stations
     .map((s) => {
       const p = s.prices.find((pr) => pr.fuel === displayFuel)?.price;
       if (p == null) return null;
+      if (priceMode === "board") {
+        // Board mode: raw pump price, no discount annotation — even if the
+        // user has active discounts configured.
+        return { id: s.id, effectiveCpl: p, hasDiscount: false };
+      }
       const eff = applyToStation(s, p, activeDiscounts);
       return {
         id: s.id,
@@ -513,22 +638,40 @@ export default function MapView({
   const initialZoom = saved ? saved.zoom : 5;
 
   const brandsInView = Array.from(new Set(stations.map((s) => s.brand))).sort();
-  const visibleStations = brandFilter ? stations.filter((s) => s.brand === brandFilter) : stations;
+  // Favourites bypass the brand filter entirely, per spec.
+  const visibleStations = favouritesOnly
+    ? stations.filter((s) => favourites.includes(s.id))
+    : brandFilter
+    ? stations.filter((s) => s.brand === brandFilter)
+    : stations;
 
-  // In-view stations, cheapest first, for the desktop side panel.
+  // Distance origin: explicit geolocation (only via the "Near me" button) wins,
+  // otherwise fall back to the map's current centre so distance is always
+  // available without ever prompting for location automatically.
+  const distanceOrigin = geoOrigin ?? mapCenter;
+
+  // In-view stations, cheapest-first (or nearest-first), for the desktop side panel.
   const listRows = visibleStations
     .map((s) => {
       const eff = effectiveById.get(s.id);
       const color = colorById.get(s.id);
       const pump = s.prices.find((p) => p.fuel === displayFuel)?.price;
       if (!eff || !color || pump == null) return null;
-      return { station: s, effectiveCpl: eff.effectiveCpl, hasDiscount: eff.hasDiscount, color, pump };
+      const distanceKm = distanceOrigin
+        ? haversineKm(distanceOrigin.lat, distanceOrigin.lng, s.lat, s.lng)
+        : null;
+      return { station: s, effectiveCpl: eff.effectiveCpl, hasDiscount: eff.hasDiscount, color, pump, distanceKm };
     })
     .filter(
-      (x): x is { station: Station; effectiveCpl: number; hasDiscount: boolean; color: string; pump: number } =>
+      (x): x is { station: Station; effectiveCpl: number; hasDiscount: boolean; color: string; pump: number; distanceKm: number | null } =>
         x != null,
     )
-    .sort((a, b) => a.effectiveCpl - b.effectiveCpl)
+    .sort((a, b) => {
+      if (sortMode === "distance" && a.distanceKm != null && b.distanceKm != null) {
+        return a.distanceKm - b.distanceKm;
+      }
+      return a.effectiveCpl - b.effectiveCpl;
+    })
     .slice(0, 100);
 
   return (
@@ -541,6 +684,7 @@ export default function MapView({
       />
       <MapController
         onBoundsChange={fetchStations}
+        onCenterChange={setMapCenter}
         fuel={fuel}
       />
       <FlyTo center={flyTo} />
@@ -554,7 +698,7 @@ export default function MapView({
       <AreaAverageLayer enabled={areaMode} stations={stations} fuel={displayFuel} />
       <MarkerClusterGroup
         ref={clusterRef}
-        key={`${brandFilter}:${displayFuel}`}
+        key={`${brandFilter}:${displayFuel}:${favouritesOnly}`}
         iconCreateFunction={createClusterIcon}
         showCoverageOnHover={false}
         maxClusterRadius={60}
@@ -645,6 +789,7 @@ export default function MapView({
                 station={station}
                 priceEntry={priceEntry}
                 activeDiscounts={activeDiscounts}
+                priceMode={priceMode}
               />
             </Popup>
           </Marker>
@@ -673,7 +818,7 @@ export default function MapView({
       </div>
       {/* End top-stacked notices */}
       <div className="absolute bottom-4 left-3 z-[1000] pointer-events-auto">
-        <button type="button" onClick={() => setAreaMode((m) => !m)} aria-pressed={areaMode} className={"inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium shadow-lg transition-colors " + (areaMode ? "bg-fs-accent text-fs-accent-ink" : "bg-fs-surface text-fs-ink hover:bg-fs-bg")}>
+        <button type="button" onClick={() => setAreaMode((m) => !m)} aria-pressed={areaMode} aria-label={areaMode ? "Tap the map to average an area" : "Toggle area average"} className={"inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium shadow-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fs-accent " + (areaMode ? "bg-fs-accent text-fs-accent-ink" : "bg-fs-surface text-fs-ink hover:bg-fs-bg")}>
           <span aria-hidden="true">📍</span> {areaMode ? "Tap the map…" : "Area average"}
         </button>
       </div>
@@ -683,32 +828,99 @@ export default function MapView({
         <div className="text-xs text-fs-muted">
           {listRows.length} stations in view{listRows[0] ? ` · cheapest ${listRows[0].effectiveCpl.toFixed(1)} c/L` : ""}
         </div>
-        <select
-          value={brandFilter}
-          onChange={(e) => setBrandFilter(e.target.value)}
-          className="mt-1.5 w-full text-xs border border-fs-line rounded px-2 py-1 bg-fs-surface text-fs-ink"
-          aria-label="Filter by brand"
-        >
-          <option value="">All brands</option>
-          {brandsInView.map((b) => (
-            <option key={b} value={b}>
-              {b}
-            </option>
-          ))}
-        </select>
+        <div className="mt-1.5 flex items-center gap-1.5">
+          <select
+            value={brandFilter}
+            onChange={(e) => setBrandFilter(e.target.value)}
+            disabled={favouritesOnly}
+            className="flex-1 min-w-0 text-xs border border-fs-line rounded px-2 py-1 bg-fs-surface text-fs-ink disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fs-accent"
+            aria-label="Filter by brand"
+          >
+            <option value="">All brands</option>
+            {brandsInView.map((b) => (
+              <option key={b} value={b}>
+                {b}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setFavouritesOnly((v) => !v)}
+            aria-pressed={favouritesOnly}
+            aria-label={favouritesOnly ? "Show all stations" : "Show favourites only"}
+            title={favouritesOnly ? "Show all stations" : "Show favourites only"}
+            className={`flex-shrink-0 inline-flex items-center gap-1 text-xs rounded px-2 py-1 border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fs-accent ${
+              favouritesOnly
+                ? "bg-fs-accent text-fs-accent-ink border-fs-accent"
+                : "bg-fs-surface text-fs-ink border-fs-line hover:bg-fs-bg"
+            }`}
+          >
+            <span aria-hidden="true">★</span> Favourites
+          </button>
+        </div>
+        <div className="mt-1.5 flex items-center gap-1.5 text-xs">
+          <span className="text-fs-muted">Sort:</span>
+          <div role="group" aria-label="Sort stations by" className="inline-flex rounded border border-fs-line overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setSortMode("price")}
+              aria-pressed={sortMode === "price"}
+              className={`px-2 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fs-accent ${
+                sortMode === "price" ? "bg-fs-accent text-fs-accent-ink" : "bg-fs-surface text-fs-ink hover:bg-fs-bg"
+              }`}
+            >
+              Price
+            </button>
+            <button
+              type="button"
+              onClick={() => setSortMode("distance")}
+              aria-pressed={sortMode === "distance"}
+              className={`px-2 py-1 border-l border-fs-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fs-accent ${
+                sortMode === "distance" ? "bg-fs-accent text-fs-accent-ink" : "bg-fs-surface text-fs-ink hover:bg-fs-bg"
+              }`}
+            >
+              Distance
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={handleUseMyLocation}
+            aria-label="Use my current location for distance sorting"
+            title="Use my current location"
+            className="ml-auto inline-flex items-center gap-1 text-fs-accent hover:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fs-accent rounded px-1"
+          >
+            <span aria-hidden="true">📍</span>
+            {geoStatus === "locating" ? "Locating…" : geoOrigin ? "Near me ✓" : "Near me"}
+          </button>
+        </div>
+        {geoStatus === "denied" && (
+          <div role="status" className="mt-1 text-[11px] text-fs-muted">
+            Location unavailable — using map centre instead.
+          </div>
+        )}
+        {showPriceModeToggle && (
+          <PriceModeToggle
+            mode={priceMode}
+            onChange={(next) => onPriceModeChange?.(next)}
+            variant="sidebar"
+          />
+        )}
       </div>
       <ul>
         {listRows.map((r) => (
-          <li key={r.station.id}>
+          <li key={r.station.id} className="flex items-center gap-1 border-b border-fs-line hover:bg-fs-bg">
             <button
               type="button"
               onClick={() => setSelected({ id: r.station.id, lat: r.station.lat, lng: r.station.lng })}
-              className="w-full text-left px-3 py-2 border-b border-fs-line hover:bg-fs-bg flex items-center gap-2"
+              className="flex-1 min-w-0 text-left px-3 py-2 flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fs-accent focus-visible:ring-inset"
             >
               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: r.color }} aria-hidden="true" />
               <span className="flex-1 min-w-0">
                 <span className="block text-sm font-medium text-fs-ink truncate">{r.station.brand}</span>
-                <span className="block text-xs text-fs-muted truncate">{r.station.suburb || r.station.address}</span>
+                <span className="block text-xs text-fs-muted truncate">
+                  {r.station.suburb || r.station.address}
+                  {r.distanceKm != null && ` · ${r.distanceKm < 10 ? r.distanceKm.toFixed(1) : Math.round(r.distanceKm)} km`}
+                </span>
               </span>
               <span className="text-right flex-shrink-0">
                 <span className="block text-sm font-semibold text-fs-ink">{r.effectiveCpl.toFixed(1)}</span>
@@ -717,6 +929,7 @@ export default function MapView({
                 )}
               </span>
             </button>
+            <FavouriteStar stationId={r.station.id} className="flex-shrink-0 min-w-[28px] min-h-[28px] mr-2" />
           </li>
         ))}
       </ul>

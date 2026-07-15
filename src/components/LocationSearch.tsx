@@ -100,17 +100,19 @@ export default function LocationSearch({ onSelect }: Props) {
       {results.length > 0 && (
         <ul className="absolute top-full left-0 right-0 mt-1 bg-fs-surface border border-fs-line rounded-lg shadow-lg z-[1001] w-full md:max-w-md max-h-[50vh] md:max-h-60 overflow-y-auto">
           {results.map((r, i) => (
-            <li
-              key={i}
-              className="min-h-[44px] px-3 py-2.5 hover:bg-fs-bg active:bg-fs-bg cursor-pointer text-sm text-fs-ink border-b border-fs-line last:border-0 flex flex-col justify-center"
-              onClick={() => {
-                onSelect(Number(r.lat), Number(r.lon));
-                setResults([]);
-                setQuery(formatResult(r));
-              }}
-            >
-              <div className="font-medium">{r.display_name.split(",")[0]}</div>
-              <div className="text-xs text-fs-muted truncate">{r.display_name}</div>
+            <li key={i} className="border-b border-fs-line last:border-0">
+              <button
+                type="button"
+                className="w-full min-h-[44px] px-3 py-2.5 hover:bg-fs-bg active:bg-fs-bg text-left text-sm text-fs-ink flex flex-col justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fs-accent focus-visible:ring-inset"
+                onClick={() => {
+                  onSelect(Number(r.lat), Number(r.lon));
+                  setResults([]);
+                  setQuery(formatResult(r));
+                }}
+              >
+                <span className="font-medium">{r.display_name.split(",")[0]}</span>
+                <span className="text-xs text-fs-muted truncate">{r.display_name}</span>
+              </button>
             </li>
           ))}
         </ul>
