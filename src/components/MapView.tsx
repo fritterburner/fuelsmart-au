@@ -569,8 +569,27 @@ export default function MapView({
     }
   }, [deepLinkStation, stations]);
 
+  // Guards against the popup-autopan feedback loop: with a popup open,
+  // react-leaflet calls popup.update() whenever its children re-render, and
+  // Leaflet's _adjustPan can then fire `moveend` (even for zero-pixel pans) —
+  // which used to refetch + re-render + update() again, forever, flooding
+  // /api/stations and freezing the tab on small screens. Dedup identical
+  // bounds+fuel fetches inside a short window so that cycle can't sustain.
+  const lastFetchKey = useRef<{ key: string; at: number } | null>(null);
+
   const fetchStations = useCallback(
     async (bounds: string) => {
+      const key = `${bounds}|${fuel}`;
+      const now = Date.now();
+      if (
+        lastFetchKey.current &&
+        lastFetchKey.current.key === key &&
+        now - lastFetchKey.current.at < 10_000
+      ) {
+        return; // identical viewport fetched moments ago — nothing new to load
+      }
+      lastFetchKey.current = { key, at: now };
+
       // Cancel any in-flight request
       if (fetchController.current) fetchController.current.abort();
       const controller = new AbortController();
@@ -587,11 +606,25 @@ export default function MapView({
         setFallbackNotice(data.fallbackNotice || null);
       } catch (e) {
         if ((e as { name?: string }).name !== "AbortError") console.error("Failed to fetch stations:", e);
+        lastFetchKey.current = null; // failed — allow an immediate retry
       }
       setLoading(false);
     },
     [fuel]
   );
+
+  // Same feedback-loop defence for the distance-sort origin: getCenter()
+  // returns a fresh object every call, so a raw setMapCenter on every
+  // `moveend` re-rendered the whole map (and the open popup) even when the
+  // centre hadn't meaningfully moved. Bail out for sub-~25 m changes.
+  const handleCenterChange = useCallback((c: { lat: number; lng: number }) => {
+    setMapCenter((prev) => {
+      if (prev && Math.abs(prev.lat - c.lat) < 2e-4 && Math.abs(prev.lng - c.lng) < 2e-4) {
+        return prev;
+      }
+      return c;
+    });
+  }, []);
 
   // Compute the DISPLAYED price (board or post-discount effective, depending
   // on `priceMode`) per station, then rank by that and remember which
@@ -684,7 +717,7 @@ export default function MapView({
       />
       <MapController
         onBoundsChange={fetchStations}
-        onCenterChange={setMapCenter}
+        onCenterChange={handleCenterChange}
         fuel={fuel}
       />
       <FlyTo center={flyTo} />
@@ -784,7 +817,10 @@ export default function MapView({
               }
             }}
           >
-            <Popup>
+            {/* maxHeight caps the popup below any phone viewport so Leaflet's
+                autopan can always converge (content scrolls instead); a popup
+                taller than the screen ping-pongs _adjustPan forever. */}
+            <Popup maxHeight={300}>
               <StationPricePopupContent
                 station={station}
                 priceEntry={priceEntry}
