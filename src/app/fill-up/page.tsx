@@ -8,6 +8,7 @@ import type { FuelCode, Station } from "@/lib/types";
 import { loadDiscounts } from "@/lib/useDiscounts";
 import { formatAge } from "@/lib/time-format";
 import StationNavLinks from "@/components/StationNavLinks";
+import NumberField from "@/components/NumberField";
 
 const FillUpMap = dynamic(() => import("./FillUpMap"), { ssr: false });
 
@@ -260,31 +261,33 @@ export default function FillUpPage() {
           </label>
           <label className="flex items-center gap-1">
             <span className="text-slate-300">Expected fill</span>
-            <input
-              type="number"
+            <NumberField
               value={fillLitres}
-              onChange={(e) =>
-                setFillLitres(Math.max(5, Math.min(200, Number(e.target.value) || 5)))
-              }
+              onChange={setFillLitres}
               min={5}
               max={200}
+              aria-describedby="fill-litres-range"
               className="bg-slate-700 text-white px-2 py-1 rounded w-16 border border-slate-600"
             />
             <span className="text-slate-300">L</span>
+            <span id="fill-litres-range" className="sr-only">
+              Between 5 and 200 litres
+            </span>
           </label>
           <label className="flex items-center gap-1">
             <span className="text-slate-300">L/100km</span>
-            <input
-              type="number"
+            <NumberField
               value={consumption}
-              onChange={(e) =>
-                setConsumption(Math.max(2, Math.min(40, Number(e.target.value) || 10)))
-              }
+              onChange={setConsumption}
               min={2}
               max={40}
-              step={0.1}
+              decimals={1}
+              aria-describedby="consumption-range"
               className="bg-slate-700 text-white px-2 py-1 rounded w-16 border border-slate-600"
             />
+            <span id="consumption-range" className="sr-only">
+              Between 2 and 40 litres per 100 kilometres
+            </span>
           </label>
           <button
             onClick={findBest}

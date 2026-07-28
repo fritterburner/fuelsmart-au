@@ -10,6 +10,7 @@ import { toFuelBucket } from "@/lib/excise/fuel-buckets";
 import type { Verdict, MarketData } from "@/lib/excise/types";
 import { assignRankColors } from "@/lib/rank-palette";
 import { formatAge } from "@/lib/time-format";
+import { sanitiseDraft } from "@/lib/number-input";
 import { applyToStation } from "@/lib/discounts";
 import type { Discount } from "@/lib/discounts";
 import { useDiscounts, loadDiscounts, saveDiscounts, hasActiveDiscounts } from "@/lib/useDiscounts";
@@ -446,11 +447,10 @@ function StationPricePopupContent({
             <label className="block text-[11px] text-gray-700">
               c/L off at this servo
               <input
-                type="number"
-                min={0}
-                step={0.1}
+                type="text"
+                inputMode="decimal"
                 value={cplOff}
-                onChange={(e) => setCplOff(e.target.value)}
+                onChange={(e) => setCplOff(sanitiseDraft(e.target.value, { decimals: 1 }))}
                 className="block w-20 mt-0.5 px-1.5 py-1 border border-gray-300 rounded font-mono"
                 autoFocus
               />

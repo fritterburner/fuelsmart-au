@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { FuelCode, VehicleProfile } from "@/lib/types";
 import { FUEL_TYPES } from "@/lib/fuel-codes";
+import NumberField from "@/components/NumberField";
 
 const DEFAULT_JERRY_LITRES = 20;
 
@@ -181,28 +182,26 @@ export default function VehicleSection({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Tank (L)</label>
-          <input
-            type="number"
+          <label htmlFor="vehicle-tank" className="block text-sm font-medium text-gray-700 mb-1">Tank (L)</label>
+          <NumberField
+            id="vehicle-tank"
             value={tank}
-            onChange={(e) => onTankChange(Number(e.target.value))}
+            onChange={onTankChange}
             className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
             min={10}
             max={200}
-            required
           />
         </div>
         <div className="col-span-2 md:col-span-1">
-          <label className="block text-sm font-medium text-gray-700 mb-1">L/100km</label>
-          <input
-            type="number"
+          <label htmlFor="vehicle-consumption" className="block text-sm font-medium text-gray-700 mb-1">L/100km</label>
+          <NumberField
+            id="vehicle-consumption"
             value={consumption}
-            onChange={(e) => onConsumptionChange(Number(e.target.value))}
-            step={0.1}
+            onChange={onConsumptionChange}
+            decimals={1}
             className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
             min={3}
             max={30}
-            required
           />
         </div>
       </div>
@@ -223,11 +222,10 @@ export default function VehicleSection({
             <label htmlFor="jerry-litres" className="text-sm text-gray-700 whitespace-nowrap">
               Capacity (L)
             </label>
-            <input
+            <NumberField
               id="jerry-litres"
-              type="number"
               value={jerry}
-              onChange={(e) => onJerryChange(Number(e.target.value))}
+              onChange={onJerryChange}
               className="w-24 px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
               min={0}
               max={200}

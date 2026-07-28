@@ -6,6 +6,7 @@ import { FuelCode } from "@/lib/types";
 import { FUEL_TYPES } from "@/lib/fuel-codes";
 import { loadSettings } from "@/lib/settings";
 import { loadVehicles } from "@/lib/vehicles";
+import { sanitiseDraft } from "@/lib/number-input";
 import {
   LogbookEntry,
   LogbookEntryDraft,
@@ -547,11 +548,12 @@ export default function LogbookPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Odometer (km, optional)</label>
                   <input
-                    type="number"
+                    type="text"
                     inputMode="numeric"
                     value={form.odometerKm}
-                    onChange={(e) => setForm({ ...form, odometerKm: e.target.value })}
-                    min={0}
+                    onChange={(e) =>
+                      setForm({ ...form, odometerKm: sanitiseDraft(e.target.value) })
+                    }
                     className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
                   />
                 </div>
@@ -575,12 +577,12 @@ export default function LogbookPage() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Litres</label>
                 <input
-                  type="number"
+                  type="text"
                   inputMode="decimal"
-                  step={0.01}
-                  min={0}
                   value={form.litres}
-                  onChange={(e) => setForm({ ...form, litres: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, litres: sanitiseDraft(e.target.value, { decimals: 2 }) })
+                  }
                   className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
                 />
               </div>
@@ -589,12 +591,12 @@ export default function LogbookPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Total paid ($)</label>
                   <input
-                    type="number"
+                    type="text"
                     inputMode="decimal"
-                    step={0.01}
-                    min={0}
                     value={form.totalCost}
-                    onChange={(e) => setForm({ ...form, totalCost: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, totalCost: sanitiseDraft(e.target.value, { decimals: 2 }) })
+                    }
                     placeholder="derived from price"
                     className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
                   />
@@ -602,12 +604,15 @@ export default function LogbookPage() {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Price (c/L)</label>
                   <input
-                    type="number"
+                    type="text"
                     inputMode="decimal"
-                    step={0.1}
-                    min={0}
                     value={form.pricePerLitre}
-                    onChange={(e) => setForm({ ...form, pricePerLitre: e.target.value })}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        pricePerLitre: sanitiseDraft(e.target.value, { decimals: 1 }),
+                      })
+                    }
                     placeholder="derived from total"
                     className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
                   />

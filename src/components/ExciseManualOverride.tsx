@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { sanitiseDraft } from "@/lib/number-input";
 import {
   BASELINE_OIL_USD,
   BASELINE_AUD_USD,
@@ -51,24 +52,20 @@ export default function ExciseManualOverride({
         <label className="block">
           <span className="block text-xs text-purple-900 mb-1">Brent crude USD/bbl</span>
           <input
-            type="number"
-            step="0.01"
-            min="1"
-            max="500"
+            type="text"
+            inputMode="decimal"
             value={oil}
-            onChange={(e) => setOil(e.target.value)}
+            onChange={(e) => setOil(sanitiseDraft(e.target.value, { decimals: 2 }))}
             className="w-full px-3 py-2 min-h-[44px] border border-purple-300 rounded text-base bg-white"
           />
         </label>
         <label className="block">
           <span className="block text-xs text-purple-900 mb-1">AUD/USD</span>
           <input
-            type="number"
-            step="0.0001"
-            min="0.1"
-            max="2"
+            type="text"
+            inputMode="decimal"
             value={aud}
-            onChange={(e) => setAud(e.target.value)}
+            onChange={(e) => setAud(sanitiseDraft(e.target.value, { decimals: 4 }))}
             className="w-full px-3 py-2 min-h-[44px] border border-purple-300 rounded text-base bg-white"
           />
         </label>

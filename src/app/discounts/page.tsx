@@ -8,6 +8,7 @@ import {
 import { loadDiscounts, saveDiscounts } from "@/lib/useDiscounts";
 import { CANONICAL_BRANDS } from "@/lib/brands";
 import type { StateCode } from "@/lib/types";
+import NumberField from "@/components/NumberField";
 
 const ALL_STATE_CODES: StateCode[] = ["NSW", "VIC", "QLD", "SA", "WA", "NT", "TAS", "ACT"];
 
@@ -175,12 +176,12 @@ export default function DiscountsPage() {
                     <option value="percent_cashback">{TYPE_LABELS.percent_cashback}</option>
                   </select>
                   <div className="flex items-center gap-1">
-                    <input
-                      type="number"
+                    <NumberField
                       value={d.value}
-                      onChange={(e) => updateDiscount(d.id, { value: Number(e.target.value) })}
-                      step={d.type === "fixed_cpl" ? 0.1 : 0.1}
+                      onChange={(v) => updateDiscount(d.id, { value: v })}
+                      decimals={1}
                       min={0}
+                      max={d.type === "percent_cashback" ? 100 : 999}
                       className="w-16 px-2 py-1.5 border border-gray-300 rounded text-sm font-mono bg-white"
                       aria-label="Discount value"
                     />

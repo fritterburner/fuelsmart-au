@@ -5,6 +5,7 @@ import Link from "next/link";
 import type { FuelCode, StateCode, Station } from "@/lib/types";
 import { FUEL_TYPES } from "@/lib/fuel-codes";
 import { getOrCreateDeviceId } from "@/lib/alerts/device-id";
+import { sanitiseDraft } from "@/lib/number-input";
 import {
   getExistingSubscription,
   needsIOSInstallGuidance,
@@ -282,12 +283,10 @@ export default function AlertsPage() {
                   Target price (c/L)
                 </label>
                 <input
-                  type="number"
+                  type="text"
+                  inputMode="decimal"
                   value={target}
-                  onChange={(e) => setTarget(e.target.value)}
-                  min={50}
-                  max={400}
-                  step={0.1}
+                  onChange={(e) => setTarget(sanitiseDraft(e.target.value, { decimals: 1 }))}
                   className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
                 />
               </div>

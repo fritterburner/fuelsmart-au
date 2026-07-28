@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { FuelCode } from "@/lib/types";
 import { getOrCreateDeviceId } from "@/lib/alerts/device-id";
+import { sanitiseDraft } from "@/lib/number-input";
 import {
   getExistingSubscription,
   needsIOSInstallGuidance,
@@ -177,12 +178,10 @@ export default function AlertBell({ stationId, stationName, fuel, currentPriceCp
                 Notify me when {fuel} drops to or below:
                 <div className="flex items-center gap-1 mt-1">
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="decimal"
                     value={target}
-                    onChange={(e) => setTarget(e.target.value)}
-                    min={50}
-                    max={400}
-                    step={0.1}
+                    onChange={(e) => setTarget(sanitiseDraft(e.target.value, { decimals: 1 }))}
                     className="w-20 px-2 py-1.5 min-h-[32px] border rounded text-sm"
                   />
                   <span>¢/L</span>

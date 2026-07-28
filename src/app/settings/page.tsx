@@ -8,6 +8,7 @@ import { loadSettings, saveSettings, UserSettings } from "@/lib/settings";
 import { useTheme } from "@/lib/useTheme";
 import { PALETTES, ThemeStyle } from "@/lib/theme";
 import Wordmark from "@/components/Wordmark";
+import NumberField from "@/components/NumberField";
 
 export default function SettingsPage() {
   const [settings, setSettings] = useState<UserSettings | null>(null);
@@ -157,31 +158,31 @@ export default function SettingsPage() {
         {/* Vehicle specs — 1 col on xs, 3 col on sm+ */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Tank Size (L)</label>
-            <input
-              type="number"
+            <label htmlFor="tank-size" className="block text-sm font-medium text-gray-700 mb-1">Tank Size (L)</label>
+            <NumberField
+              id="tank-size"
               value={settings.tankSize}
-              onChange={(e) => set("tankSize", Number(e.target.value))}
+              onChange={(v) => set("tankSize", v)}
               className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
               min={10} max={200}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">L/100km</label>
-            <input
-              type="number"
+            <label htmlFor="consumption" className="block text-sm font-medium text-gray-700 mb-1">L/100km</label>
+            <NumberField
+              id="consumption"
               value={settings.consumption}
-              onChange={(e) => set("consumption", Number(e.target.value))}
+              onChange={(v) => set("consumption", v)}
               className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
-              step={0.1} min={3} max={30}
+              decimals={1} min={3} max={30}
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Jerry Cans (L)</label>
-            <input
-              type="number"
+            <label htmlFor="jerry-capacity" className="block text-sm font-medium text-gray-700 mb-1">Jerry Cans (L)</label>
+            <NumberField
+              id="jerry-capacity"
               value={settings.jerryCapacity}
-              onChange={(e) => set("jerryCapacity", Number(e.target.value))}
+              onChange={(v) => set("jerryCapacity", v)}
               className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
               min={0} max={200}
             />
@@ -217,18 +218,13 @@ export default function SettingsPage() {
 
         {/* Map palette: number of cheapest stations to highlight green */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="cheapest-highlight-count" className="block text-sm font-medium text-gray-700 mb-1">
             Highlight N cheapest stations onscreen
           </label>
-          <input
-            type="number"
+          <NumberField
+            id="cheapest-highlight-count"
             value={settings.cheapestHighlightCount}
-            onChange={(e) =>
-              set(
-                "cheapestHighlightCount",
-                Math.max(1, Math.min(10, Number(e.target.value) || 1)),
-              )
-            }
+            onChange={(v) => set("cheapestHighlightCount", v)}
             min={1}
             max={10}
             className="w-full px-3 py-2.5 min-h-[44px] border rounded-lg text-base"
