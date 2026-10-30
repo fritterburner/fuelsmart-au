@@ -21,6 +21,13 @@ export interface RouteResult {
   geometryLatLng: [number, number][];
   /** Which provider answered — useful for logging / observability. */
   provider: "osrm" | "ors";
+  /** One entry per waypoint pair, in order — the per-stop distances an itinerary needs. */
+  legs: RouteLeg[];
+}
+
+export interface RouteLeg {
+  distanceMeters: number;
+  durationSeconds: number;
 }
 
 /**
@@ -112,6 +119,7 @@ async function tryOsrm(
       distance: number;
       duration: number;
       geometry: { coordinates: [number, number][] };
+      legs?: Array<{ distance: number; duration: number }>;
     }>;
   };
   try {
@@ -132,6 +140,7 @@ async function tryOsrm(
       durationSeconds: route.duration,
       geometryLatLng: route.geometry.coordinates.map(([lng, lat]) => [lat, lng]),
       provider: "osrm",
+      legs: (route.legs ?? []).map((l) => ({ distanceMeters: l.distance, durationSeconds: l.duration })),
     },
   };
 }
@@ -178,7 +187,10 @@ async function tryOrs(
   let data: {
     features?: Array<{
       geometry?: { coordinates?: [number, number][] };
-      properties?: { summary?: { distance?: number; duration?: number } };
+      properties?: {
+        summary?: { distance?: number; duration?: number };
+        segments?: Array<{ distance: number; duration: number }>;
+      };
     }>;
   };
   try {
@@ -206,6 +218,7 @@ async function tryOrs(
       durationSeconds: summary.duration,
       geometryLatLng: coords.map(([lng, lat]) => [lat, lng]),
       provider: "ors",
+      legs: (feature?.properties?.segments ?? []).map((s) => ({ distanceMeters: s.distance, durationSeconds: s.duration })),
     },
   };
 }
