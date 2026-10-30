@@ -115,3 +115,6 @@ html, body {
 [data-palette="hivis"]{--fs-bg:#17191D;--fs-surface:#1E2228;--fs-ink:#F2F0EA;--fs-muted:#9CA0A6;--fs-line:#30343C;--fs-grey:#70757D;--fs-accent:#FFB000;--fs-accent-ink:#1C1400;--fs-green:#3FC56B;--fs-amber:#E59400;--fs-red:#FF5A4D;--fs-card-bg:#1E2228;--fs-card-k:#FFB000;--fs-card-ink:#F2F0EA;--fs-card-muted:#9CA0A6;--fs-map-bg:#101216;--fs-road:#262A31;--fs-water:#15282E}
 [data-palette="terminal"]{--fs-bg:#0A0F0A;--fs-surface:#0E140E;--fs-ink:#CFE9D3;--fs-muted:#6E8A72;--fs-line:#1B2A1D;--fs-grey:#4F6B53;--fs-accent:#43F08A;--fs-accent-ink:#04210F;--fs-green:#43F08A;--fs-amber:#E3C341;--fs-red:#FF6B6B;--fs-card-bg:#0E140E;--fs-card-k:#43F08A;--fs-card-ink:#CFE9D3;--fs-card-muted:#6E8A72;--fs-map-bg:#070B07;--fs-road:#142016;--fs-water:#0C2417}
 [data-palette="swiss"]{--fs-bg:#FFFFFF;--fs-surface:#fff;--fs-ink:#111111;--fs-muted:#555555;--fs-line:#111111;--fs-grey:#444444;--fs-accent:#E5392E;--fs-accent-ink:#fff;--fs-green:#1F8A4C;--fs-amber:#C97A12;--fs-red:#E5392E;--fs-card-bg:#111;--fs-card-k:#E5392E;--fs-card-ink:#fff;--fs-card-muted:#bbb;--fs-map-bg:#EFEFEF;--fs-road:#DCDCDC;--fs-water:#DBE4E8}
+
+/* Keyless dark basemap: CSS-inverted OSM raster (CARTO tiles now need an API key). */
+.tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9); }

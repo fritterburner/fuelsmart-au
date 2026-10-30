@@ -5,6 +5,7 @@ import { FuelCode, DestinationFuelInfo } from "@/lib/types";
 import { FUEL_FALLBACKS } from "@/lib/fuel-codes";
 import { applyToStation, type Discount } from "@/lib/discounts";
 import { getRoute, RouteThrottledError } from "@/lib/routing/get-route";
+import { isPriceCurrent } from "@/lib/price-age";
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -122,11 +123,11 @@ export async function GET(request: NextRequest) {
     .map((s) => {
       const dist = haversine(finalLat, finalLng, s.lat, s.lng);
       if (dist > 25) return null;
-      let priceEntry = s.prices.find((p) => p.fuel === fuel);
+      let priceEntry = s.prices.find((p) => p.fuel === fuel && isPriceCurrent(p, s.state));
       let usedFuel = fuel;
       if (!priceEntry) {
         for (const fb of fallbacks) {
-          priceEntry = s.prices.find((p) => p.fuel === fb);
+          priceEntry = s.prices.find((p) => p.fuel === fb && isPriceCurrent(p, s.state));
           if (priceEntry) { usedFuel = fb; break; }
         }
       }

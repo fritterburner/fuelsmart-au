@@ -164,6 +164,17 @@ function StopList({
             )}
             <span className="text-gray-700">Add {stop.litresAdded.toFixed(1)}L</span>
             <span className="font-bold text-gray-900">${stop.cost.toFixed(2)}</span>
+            {(() => {
+              // NT publishes tomorrow's locked price from 2:30 pm — show it when it differs.
+              const entry = stop.station.prices.find(
+                (p) => p.fuel === (stop.fallbackFuel ?? p.fuel) && typeof p.scheduled === "number",
+              );
+              return entry?.scheduled !== undefined ? (
+                <span className="text-xs text-sky-800 bg-sky-50 border border-sky-200 px-1.5 py-0.5 rounded">
+                  Tomorrow {entry.scheduled.toFixed(1)} c/L
+                </span>
+              ) : null;
+            })()}
           </div>
 
           {/* Fuel gauge bar — taller on mobile for readability */}

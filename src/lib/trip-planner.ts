@@ -1,5 +1,6 @@
 import { Station, FuelCode, TripStop, TripPlan, TripComparison, StrategyResult } from "./types";
 import { FUEL_FALLBACKS } from "./fuel-codes";
+import { isPriceCurrent } from "./price-age";
 import { applyToStation, type Discount } from "./discounts";
 
 interface TripParams {
@@ -172,11 +173,15 @@ function prepareRouteStations(
   const routeStations: RouteStation[] = [];
   for (const s of stations) {
     // Try primary fuel first, then fallbacks
-    let priceEntry = s.prices.find((p) => p.fuel === fuel);
+    // A price older than the state's scheme cadence allows is not a price —
+    // the planner must never route a fill around a 13-month-old number.
+    const current = (p: { fuel: FuelCode; updated: string; price: number }) =>
+      isPriceCurrent(p, s.state);
+    let priceEntry = s.prices.find((p) => p.fuel === fuel && current(p));
     let usedFallback: FuelCode | undefined;
     if (!priceEntry && fallbacks.length > 0) {
       for (const fb of fallbacks) {
-        priceEntry = s.prices.find((p) => p.fuel === fb);
+        priceEntry = s.prices.find((p) => p.fuel === fb && current(p));
         if (priceEntry) { usedFallback = fb; break; }
       }
     }

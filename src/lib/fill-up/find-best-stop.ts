@@ -9,6 +9,7 @@
  */
 
 import type { Station, FuelCode } from "../types";
+import { isPriceCurrent } from "../price-age";
 import { FUEL_FALLBACKS } from "../fuel-codes";
 import { haversine } from "../trip-planner";
 import { OsrmThrottledError, type OsrmResult } from "./osrm";
@@ -158,7 +159,7 @@ export async function findBestStop(
   //    a brand-loyalty station that's only cheap *for them*.
   const priced = corridor
     .map((s) => {
-      const entry = s.prices.find((p) => p.fuel === fuelUsed);
+      const entry = s.prices.find((p) => p.fuel === fuelUsed && isPriceCurrent(p, s.state));
       if (!entry) return null;
       const eff = applyToStation(s, entry.price, discounts);
       return {
@@ -260,7 +261,7 @@ function resolveFuel(
   fuel: FuelCode,
 ): { fuelUsed: FuelCode; pool: Station[]; fallbackNotice: string | null } {
   const primaryPool = stations.filter((s) =>
-    s.prices.some((p) => p.fuel === fuel),
+    s.prices.some((p) => p.fuel === fuel && isPriceCurrent(p, s.state)),
   );
   if (primaryPool.length > 0) {
     return { fuelUsed: fuel, pool: primaryPool, fallbackNotice: null };
@@ -268,7 +269,7 @@ function resolveFuel(
   const chain = FUEL_FALLBACKS[fuel] ?? [];
   for (const alt of chain) {
     const altPool = stations.filter((s) =>
-      s.prices.some((p) => p.fuel === alt),
+      s.prices.some((p) => p.fuel === alt && isPriceCurrent(p, s.state)),
     );
     if (altPool.length > 0) {
       return {

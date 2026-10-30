@@ -98,7 +98,7 @@ export async function fetchQLDStations(): Promise<Station[]> {
     priceMap.get(p.SiteId)!.push({
       fuel: fuelCode,
       price: cpl,
-      updated: p.TransactionDateUtc,
+      updated: /(Z|[+-]\d{2}:?\d{2})$/i.test(p.TransactionDateUtc) ? p.TransactionDateUtc : `${p.TransactionDateUtc}Z`,
     });
   }
 

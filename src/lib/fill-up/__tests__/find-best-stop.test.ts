@@ -32,7 +32,7 @@ function station(
     prices: Object.entries(pricesByFuel).map(([fuel, price]) => ({
       fuel: fuel as Station["prices"][number]["fuel"],
       price,
-      updated: "2026-04-21T00:00:00Z",
+      updated: new Date().toISOString(),
     })),
   };
 }

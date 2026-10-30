@@ -2,6 +2,8 @@ export interface StationPrice {
   fuel: FuelCode;
   price: number; // cents per litre
   updated: string; // ISO 8601
+  /** Tomorrow's locked price where the scheme publishes it ahead (NT after 2:30 pm) */
+  scheduled?: number;
 }
 
 export type StateCode = "NT" | "QLD" | "WA" | "NSW" | "ACT" | "SA" | "VIC" | "TAS";

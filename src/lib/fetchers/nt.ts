@@ -16,11 +16,15 @@ interface NTOutlet {
     FuelCode: string;
     Price: number;
     isAvailable: boolean;
+    PriceScheduled?: number;
+    isAvailableScheduled?: boolean;
   }[];
 }
 
 interface NTServerJson {
   FuelOutlet: NTOutlet[];
+  /** True after the daily 2:30 pm cut-over, when tomorrow's prices are published */
+  ShowScheduledPrice?: boolean;
 }
 
 export async function fetchNTStations(): Promise<Station[]> {
@@ -62,6 +66,15 @@ export async function fetchNTStations(): Promise<Station[]> {
         fuel: NT_FUEL_MAP[f.FuelCode],
         price: f.Price, // already in cents/L
         updated: now,
+        // NT retailers may change price once a day; from 2:30 pm the feed
+        // publishes tomorrow's price alongside today's.
+        ...(data.ShowScheduledPrice &&
+        typeof f.PriceScheduled === "number" &&
+        f.isAvailableScheduled !== false &&
+        f.PriceScheduled !== f.Price &&
+        isRealisticPrice(f.PriceScheduled, NT_FUEL_MAP[f.FuelCode])
+          ? { scheduled: f.PriceScheduled }
+          : {}),
       }));
 
     return {

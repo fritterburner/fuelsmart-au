@@ -106,3 +106,26 @@ describe("planTrip", () => {
     expect(plan.warnings.length).toBeGreaterThan(0);
   });
 });
+
+describe("stale prices", () => {
+  it("never buys at a station whose price is older than the scheme allows (United Cardwell regression)", () => {
+    const geometry: [number, number][] = Array.from({ length: 100 }, (_, i) => [
+      -12 - i * 0.1, 131,
+    ]);
+    const stale = makeStation("stale-bargain", -17.0, 131.0, 174.9); // 500km in
+    stale.state = "QLD";
+    stale.prices[0].updated = "2025-09-10T01:35:37.357"; // 13 months old, no zone suffix
+    const stations = [
+      makeStation("start", -12.5, 131.0, 240),
+      stale,
+      makeStation("honest", -17.2, 131.0, 245),
+      makeStation("end", -20.5, 131.0, 230),
+    ];
+    const plan = planTrip({
+      fuel: "U91", tankSize: 45, consumption: 11.5, jerryCapacity: 40,
+      routeGeometry: geometry, stations, totalDistance: 1000,
+    });
+    expect(plan.stops.map((s) => s.station.id)).not.toContain("stale-bargain");
+    expect(plan.stops.length).toBeGreaterThan(0);
+  });
+});

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCachedStations } from "@/lib/cache";
 import { FuelCode } from "@/lib/types";
 import { FUEL_FALLBACKS } from "@/lib/fuel-codes";
+import { isPriceCurrent } from "@/lib/price-age";
 
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams;
@@ -16,7 +17,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  let filtered = stations;
+  // Strip prices older than the state's scheme cadence allows; a station with
+  // nothing current left simply has no price to show.
+  const now = Date.now();
+  let filtered = stations
+    .map((s) => ({ ...s, prices: s.prices.filter((p) => isPriceCurrent(p, s.state, now)) }))
+    .filter((s) => s.prices.length > 0);
 
   // Filter by bounding box if provided
   if (bounds) {
